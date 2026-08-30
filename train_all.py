@@ -41,9 +41,7 @@ from stable_baselines3.common.vec_env import VecNormalize, DummyVecEnv
 from envs import DroneEnv2D, DroneEnvTau2D
 
 
-# ------------------------------------------------------------------ #
-#  Helper: compute tau-error from a trajectory                        #
-# ------------------------------------------------------------------ #
+# Hulpfunctie: tau-fout berekenen uit een traject
 
 def compute_tau_error(z_list, vz_list, dt=0.1):
     """
@@ -66,9 +64,7 @@ def compute_tau_error(z_list, vz_list, dt=0.1):
     return float(np.mean(errors)) if errors else float("nan")
 
 
-# ------------------------------------------------------------------ #
-#  Metrics callback: saves learning curves to CSV                     #
-# ------------------------------------------------------------------ #
+# Metrics-callback: slaat leercurves op naar CSV
 
 class MetricsCallback(BaseCallback):
     """
@@ -182,9 +178,7 @@ class MetricsCallback(BaseCallback):
         return True
 
 
-# ------------------------------------------------------------------ #
-#  Main training function                                             #
-# ------------------------------------------------------------------ #
+# Hoofdfunctie voor training
 
 def train(agent: str, seed: int, coeff: float, total_steps: int):
 
@@ -309,9 +303,7 @@ def train(agent: str, seed: int, coeff: float, total_steps: int):
     eval_env.close()
 
 
-# ------------------------------------------------------------------ #
-#  Entry point                                                         #
-# ------------------------------------------------------------------ #
+# Startpunt
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train PPO on DroneEnv2D or DroneEnvTau2D")

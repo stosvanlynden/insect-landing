@@ -35,9 +35,7 @@ from stable_baselines3.common.vec_env import VecNormalize
 from envs import DroneEnvTau2D
 
 
-# ------------------------------------------------------------------ #
-#  Custom callback: prints a one-line progress summary every N steps  #
-# ------------------------------------------------------------------ #
+# Aangepaste callback: print elke N stappen een voortgangsregel
 
 class ProgressCallback(BaseCallback):
     """Prints training progress without needing TensorBoard."""
@@ -65,9 +63,7 @@ class ProgressCallback(BaseCallback):
         return True
 
 
-# ------------------------------------------------------------------ #
-#  Training configuration                                             #
-# ------------------------------------------------------------------ #
+# Trainingsconfiguratie
 
 TOTAL_TIMESTEPS = 1_000_000
 N_ENVS    = 4
@@ -76,9 +72,7 @@ LOG_DIR   = "logs_tau"
 MODEL_NAME = "ppo_drone_tau"
 
 
-# ------------------------------------------------------------------ #
-#  Main training function                                             #
-# ------------------------------------------------------------------ #
+# Hoofdfunctie voor training
 
 def train():
     os.makedirs(MODEL_DIR, exist_ok=True)

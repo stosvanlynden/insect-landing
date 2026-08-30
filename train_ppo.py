@@ -44,9 +44,7 @@ from stable_baselines3.common.vec_env import VecNormalize
 from envs import DroneEnv2D
 
 
-# ------------------------------------------------------------------ #
-#  Custom callback: prints a one-line summary every N timesteps       #
-# ------------------------------------------------------------------ #
+# Aangepaste callback: print elke N stappen een regel samenvatting
 
 class ProgressCallback(BaseCallback):
     """
@@ -79,9 +77,7 @@ class ProgressCallback(BaseCallback):
         return True  # returning False would stop training early
 
 
-# ------------------------------------------------------------------ #
-#  Training configuration                                             #
-# ------------------------------------------------------------------ #
+# Trainingsconfiguratie
 
 # Total number of environment steps to train for.
 # More = better agent, but slower. Start with 200k to get a feel.
@@ -98,9 +94,7 @@ LOG_DIR   = "logs"
 MODEL_NAME = "ppo_drone"
 
 
-# ------------------------------------------------------------------ #
-#  Main training function                                             #
-# ------------------------------------------------------------------ #
+# Hoofdfunctie voor training
 
 def train():
     os.makedirs(MODEL_DIR, exist_ok=True)
@@ -231,9 +225,7 @@ def train():
     eval_env.close()
 
 
-# ------------------------------------------------------------------ #
-#  Entry point                                                         #
-# ------------------------------------------------------------------ #
+# Startpunt
 
 if __name__ == "__main__":
     train()

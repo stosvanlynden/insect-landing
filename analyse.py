@@ -34,9 +34,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 
 from envs import DroneEnv2D, DroneEnvTau2D
 
-# ------------------------------------------------------------------ #
-#  Paths                                                               #
-# ------------------------------------------------------------------ #
+# Paden
 
 SEEDS        = [0, 1, 2]
 COEFFS       = [0.00, 0.02, 0.05, 0.10, 0.20, 0.50]
@@ -65,9 +63,7 @@ def log_path(agent, seed, coeff=0.10):
     return os.path.join("logs", f"tau_seed{seed}_coeff{cs}.csv")
 
 
-# ------------------------------------------------------------------ #
-#  Helper: load model + eval env                                      #
-# ------------------------------------------------------------------ #
+# Hulpfunctie: model + evaluatie-omgeving laden
 
 def load_model_env(model_path, norm_path, env_class, wind=0.0, coeff=0.10):
     if not os.path.exists(model_path):
@@ -85,9 +81,7 @@ def load_model_env(model_path, norm_path, env_class, wind=0.0, coeff=0.10):
     return model, vec
 
 
-# ------------------------------------------------------------------ #
-#  Helper: run paired evaluation (same start seeds for both agents)   #
-# ------------------------------------------------------------------ #
+# Hulpfunctie: gepaarde evaluatie uitvoeren (zelfde startseeds voor beide agents)
 
 def compute_tau_error_traj(z_list, vz_list, dt=0.1):
     errors, tau_prev = [], None
@@ -159,9 +153,7 @@ def run_paired_eval(model_b, env_b, model_t, env_t, n=N_EVAL_EPS):
             dtau_b_all, dtau_t_all)
 
 
-# ------------------------------------------------------------------ #
-#  Bootstrap confidence interval                                      #
-# ------------------------------------------------------------------ #
+# Bootstrap betrouwbaarheidsinterval
 
 def bootstrap_ci(data, n_boot=2000, ci=0.95):
     data = np.array([x for x in data if not np.isnan(x)])
@@ -173,9 +165,7 @@ def bootstrap_ci(data, n_boot=2000, ci=0.95):
     return lo, hi
 
 
-# ------------------------------------------------------------------ #
-#  Read learning-curve CSVs                                           #
-# ------------------------------------------------------------------ #
+# Leercurve-CSV's inlezen
 
 def read_learning_csv(path):
     if not os.path.exists(path):
@@ -207,9 +197,7 @@ def learning_mean_std(agent, seeds, coeff=0.10):
     return all_data, timesteps, min_len
 
 
-# ================================================================== #
-#  FIGURE 1: Learning curves                                          #
-# ================================================================== #
+# FIGUUR 1: Leercurves
 
 def fig_learning_curves():
     print("Generating Fig 1: Learning curves...")
@@ -286,9 +274,7 @@ def fig_learning_curves():
     print(f"  Saved: {path}")
 
 
-# ================================================================== #
-#  FIGURE 2: Box plots (paired evaluation)                           #
-# ================================================================== #
+# FIGUUR 2: Boxplots (gepaarde evaluatie)
 
 def fig_boxplots_and_stats():
     print("\nGenerating Fig 2: Box plots + statistics...")
@@ -419,9 +405,7 @@ def fig_boxplots_and_stats():
     return all_dtau_b, all_dtau_t
 
 
-# ================================================================== #
-#  FIGURE 3: dtau/dt histogram                                        #
-# ================================================================== #
+# FIGUUR 3: dtau/dt-histogram
 
 def fig_tau_histogram(dtau_b, dtau_t):
     print("\nGenerating Fig 3: dtau/dt histogram...")
@@ -470,9 +454,7 @@ def fig_tau_histogram(dtau_b, dtau_t):
     print(f"  Baseline mean dtau/dt: {m_b:.3f}  |  Tau mean dtau/dt: {m_t:.3f}")
 
 
-# ================================================================== #
-#  FIGURE 4: Wind robustness                                          #
-# ================================================================== #
+# FIGUUR 4: Windrobuustheid
 
 def fig_wind_robustness():
     print("\nGenerating Fig 4: Wind robustness...")
@@ -543,59 +525,67 @@ def fig_wind_robustness():
     print(f"  Saved: {path}")
 
 
-# ================================================================== #
-#  FIGURE 5: Sensitivity analysis                                     #
-# ================================================================== #
+# FIGUUR 5: Sensitiviteitsanalyse
 
 def fig_sensitivity():
     print("\nGenerating Fig 5: Sensitivity analysis...")
 
+    SEEDS = [0, 1, 2]
     results = []
     for coeff in COEFFS:
-        model_path, norm_path = tau_paths(0, coeff)
-        if coeff == 0.10:
-            # The coeff=0.10 folder is the main-experiment run (trained to
-            # 1M steps), so "best_model.zip" is not comparable to the other
-            # coefficients' 500k-step-only runs. Use the checkpoint saved at
-            # exactly 500k steps instead, for a fair matched-budget point.
-            matched_ckpt = os.path.join("models_tau", "seed_0", "coeff_0p10",
-                                         "ckpt_tau_s0_500000_steps.zip")
-            if os.path.exists(matched_ckpt):
-                model_path = matched_ckpt
-        if not os.path.exists(model_path):
-            print(f"  coeff={coeff}: model missing at {model_path}")
+        seed_vzs, seed_tes = [], []
+        for seed in SEEDS:
+            model_path, norm_path = tau_paths(seed, coeff)
+            if coeff == 0.10:
+                # The coeff=0.10 folders are the main-experiment runs (trained
+                # to 1M steps), so "best_model.zip" is not comparable to the
+                # other coefficients' 500k-step-only runs. Use the checkpoint
+                # saved at exactly 500k steps instead, for a fair
+                # matched-budget point.
+                matched_ckpt = os.path.join(
+                    "models_tau", f"seed_{seed}", "coeff_0p10",
+                    f"ckpt_tau_s{seed}_500000_steps.zip")
+                if os.path.exists(matched_ckpt):
+                    model_path = matched_ckpt
+            if not os.path.exists(model_path):
+                print(f"  coeff={coeff} seed={seed}: model missing at {model_path}")
+                continue
+
+            model, vec_env = load_model_env(model_path, norm_path, DroneEnvTau2D, coeff=coeff)
+            if model is None:
+                continue
+
+            vz_list, te_list = [], []
+            obs = vec_env.reset()
+            ep_z, ep_vz = [], []
+            episodes_done = 0
+            while episodes_done < 30:
+                action, _ = model.predict(obs, deterministic=True)
+                obs, _, done, info = vec_env.step(action)
+                i = info[0]
+                ep_z.append(i["z"]); ep_vz.append(i["vz"])
+                if done[0]:
+                    vz_list.append(abs(i["vz"]))
+                    te_list.append(compute_tau_error_traj(ep_z, ep_vz))
+                    obs = vec_env.reset(); ep_z = []; ep_vz = []
+                    episodes_done += 1
+            vec_env.close()
+
+            te_clean = [x for x in te_list if not np.isnan(x)]
+            seed_vzs.append(np.mean(vz_list))
+            seed_tes.append(np.mean(te_clean) if te_clean else float("nan"))
+
+        if not seed_vzs:
             continue
-
-        model, vec_env = load_model_env(model_path, norm_path, DroneEnvTau2D, coeff=coeff)
-        if model is None:
-            continue
-
-        vz_list, te_list = [], []
-        obs = vec_env.reset()
-        ep_z, ep_vz = [], []
-        episodes_done = 0
-        while episodes_done < 30:
-            action, _ = model.predict(obs, deterministic=True)
-            obs, _, done, info = vec_env.step(action)
-            i = info[0]
-            ep_z.append(i["z"]); ep_vz.append(i["vz"])
-            if done[0]:
-                vz_list.append(abs(i["vz"]))
-                te_list.append(compute_tau_error_traj(ep_z, ep_vz))
-                obs = vec_env.reset(); ep_z = []; ep_vz = []
-                episodes_done += 1
-        vec_env.close()
-
-        te_clean = [x for x in te_list if not np.isnan(x)]
         results.append({
             "coeff":    coeff,
-            "mean_vz":  np.mean(vz_list),
-            "std_vz":   np.std(vz_list),
-            "mean_te":  np.mean(te_clean) if te_clean else float("nan"),
-            "std_te":   np.std(te_clean)  if te_clean else 0.0,
+            "mean_vz":  np.mean(seed_vzs),
+            "std_vz":   np.std(seed_vzs),
+            "mean_te":  np.mean(seed_tes),
+            "std_te":   np.std(seed_tes),
         })
-        print(f"  coeff={coeff:.2f}: mean_vz={np.mean(vz_list):.3f}  "
-              f"tau_err={np.mean(te_clean):.3f}")
+        print(f"  coeff={coeff:.2f}: mean_vz={np.mean(seed_vzs):.3f}+/-{np.std(seed_vzs):.3f}  "
+              f"tau_err={np.mean(seed_tes):.3f}+/-{np.std(seed_tes):.3f}  (n={len(seed_vzs)} seeds)")
 
     if not results:
         print("  No sensitivity data found.")
@@ -609,8 +599,8 @@ def fig_sensitivity():
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
     fig.suptitle("Sensitivity analysis: effect of tau shaping coefficient\n"
-                 "(seed=0, 30 eval episodes each, all six at the matched"
-                 " 500k-step checkpoint)",
+                 "(mean +/- std across 3 seeds, 30 eval episodes each, all"
+                 " six at the matched 500k-step checkpoint)",
                  fontsize=10, fontweight="bold")
 
     for ax, means, stds, ylabel, title, color in zip(
@@ -648,9 +638,7 @@ def fig_sensitivity():
     print(f"  Saved: {path}")
 
 
-# ================================================================== #
-#  Entry point                                                         #
-# ================================================================== #
+# Startpunt
 
 if __name__ == "__main__":
     np.random.seed(0)

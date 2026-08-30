@@ -1,0 +1,66 @@
+\chapter{Theoretical Background}
+\label{ch:theory}
+
+\section{Tau-Theory}
+\label{sec:tau}
+
+Let $z$ denote the altitude of a descending vehicle and $v_z < 0$ its vertical velocity.
+The \emph{tau} variable is defined as the optical time-to-contact \cite{lee1976}:
+%
+\begin{equation}
+  \tau = \frac{z}{|v_z|}  \qquad [\text{s}].
+  \label{eq:tau}
+\end{equation}
+%
+Lee \cite{lee1976} showed that if $\dot{\tau}$ is held constant at a value
+$\kappa \in (-1,\, 0)$ throughout descent, the vehicle decelerates monotonically and
+touches down with zero velocity.
+For $\kappa = -0.5$---the value empirically observed in honeybees \cite{srinivasan1996}
+and flies \cite{wagner1982}---the required net upward acceleration is:
+%
+\begin{equation}
+  a_{z,\text{net}} = (\kappa + 1)\,\frac{v_z^2}{z} = 0.5\,\frac{v_z^2}{z}.
+  \label{eq:tau_thrust}
+\end{equation}
+%
+Since $v_z^2/z \geq 0$, this thrust is always non-negative (decelerating), confirming
+that the strategy is physically realisable without negative thrust.
+The key insight is that tau-regulation is purely \emph{reactive}: the insect does not need
+to know its absolute altitude or velocity, only the ratio $\tau$ perceived from optic flow.
+
+\section{Proximal Policy Optimisation}
+\label{sec:ppo}
+
+Proximal Policy Optimisation (PPO) \cite{schulman2017ppo} is an on-policy actor-critic
+algorithm that updates the policy $\pi_\theta$ by maximising the clipped surrogate
+objective:
+%
+\begin{equation}
+  \mathcal{L}^{\text{CLIP}}(\theta) =
+  \hat{\mathbb{E}}_t\!\left[
+    \min\!\left(r_t(\theta)\,\hat{A}_t,\;
+    \mathrm{clip}(r_t(\theta),\, 1{-}\varepsilon,\, 1{+}\varepsilon)\,\hat{A}_t
+    \right)
+  \right],
+  \label{eq:ppo}
+\end{equation}
+%
+where $r_t(\theta) = \pi_\theta(a_t | s_t) / \pi_{\theta_\text{old}}(a_t | s_t)$
+is the probability ratio between the new and old policy, $\hat{A}_t$ is the generalised
+advantage estimate (GAE), and $\varepsilon = 0.2$ is the clip parameter that prevents
+destructively large policy updates.
+PPO is stable and sample-efficient for continuous control, making it well-suited to the
+landing task studied here.
+
+\section{Potential-Based Reward Shaping}
+\label{sec:shaping}
+
+To guide learning without altering the optimal policy, a shaping reward of the form
+$F(s, s') = \gamma\,\Phi(s') - \Phi(s)$, derived from a potential function $\Phi$,
+can be added to the environment reward \cite{ng1999}.
+Ng et al.\ \cite{ng1999} proved that potential-based shaping is \emph{policy invariant}:
+the set of optimal policies under the augmented reward is identical to that under the
+original reward.
+In this work, the tau shaping signal is a quadratic penalty on $|\dot{\tau} - \kappa|$,
+which approximates a potential on $\tau$ for small time steps, satisfying the invariance
+condition in the limit $\Delta t \to 0$.

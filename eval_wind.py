@@ -31,9 +31,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 from envs import DroneEnv2D, DroneEnvTau2D
 
 
-# ------------------------------------------------------------------ #
-#  Configuration                                                       #
-# ------------------------------------------------------------------ #
+# Configuratie
 
 SEEDS          = [0, 1, 2]
 WIND_LEVELS    = [0.0, 0.5, 1.0, 1.5, 2.0]   # m/s² disturbance magnitude
@@ -48,9 +46,7 @@ OUTPUT_DIR  = "results"
 OUTPUT_FILE = os.path.join(OUTPUT_DIR, "wind_robustness.csv")
 
 
-# ------------------------------------------------------------------ #
-#  Helper: run N episodes and return success rate + mean landing vz   #
-# ------------------------------------------------------------------ #
+# Hulpfunctie: N episodes uitvoeren, geeft succespercentage + gemiddelde landings-vz terug
 
 def evaluate_wind(model, vec_env, env_class, n_episodes: int, seed_offset: int = 0):
     """
@@ -92,9 +88,7 @@ def evaluate_wind(model, vec_env, env_class, n_episodes: int, seed_offset: int =
     return success_rate, mean_vz
 
 
-# ------------------------------------------------------------------ #
-#  Main                                                                #
-# ------------------------------------------------------------------ #
+# Hoofdprogramma
 
 def load_model_with_norm(model_path, norm_path, env_class, wind_force):
     """Load a trained model with a wind-disturbance eval environment."""

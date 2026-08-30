@@ -32,9 +32,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 from envs import DroneEnv2D, DroneEnvTau2D
 
 
-# ------------------------------------------------------------------ #
-#  File paths                                                          #
-# ------------------------------------------------------------------ #
+# Bestandspaden
 
 BASELINE_MODEL = "models/best/best_model.zip"
 BASELINE_NORM  = "models/vec_normalize.pkl"
@@ -45,9 +43,7 @@ TAU_NORM       = "models_tau/vec_normalize.pkl"
 N_EVAL_EPISODES = 30
 
 
-# ------------------------------------------------------------------ #
-#  Helper: compute tau + tau_dot from a trajectory                    #
-# ------------------------------------------------------------------ #
+# Hulpfunctie: tau + tau_dot berekenen uit een traject
 
 def compute_tau_profile(z_list: list, vz_list: list, dt: float = 0.1) -> tuple:
     """
@@ -76,9 +72,7 @@ def compute_tau_profile(z_list: list, vz_list: list, dt: float = 0.1) -> tuple:
     return tau_list, tau_dot_list
 
 
-# ------------------------------------------------------------------ #
-#  Run one episode, collect full trajectory                           #
-# ------------------------------------------------------------------ #
+# Een episode uitvoeren, volledig traject verzamelen
 
 def run_episode(model, vec_env, env_class) -> dict:
     """
@@ -134,9 +128,7 @@ def run_episode(model, vec_env, env_class) -> dict:
     }
 
 
-# ------------------------------------------------------------------ #
-#  Evaluate N episodes for one agent                                  #
-# ------------------------------------------------------------------ #
+# N episodes evalueren voor een agent
 
 def evaluate_agent(model, vec_env, env_class, label: str, n: int = N_EVAL_EPISODES) -> list:
     """Run n episodes and print per-episode results."""
@@ -158,9 +150,7 @@ def evaluate_agent(model, vec_env, env_class, label: str, n: int = N_EVAL_EPISOD
     return results
 
 
-# ------------------------------------------------------------------ #
-#  Print comparison summary                                           #
-# ------------------------------------------------------------------ #
+# Vergelijkingssamenvatting printen
 
 def print_summary(baseline_results: list, tau_results: list, n: int):
     """Print a side-by-side comparison table."""
@@ -223,17 +213,13 @@ def print_summary(baseline_results: list, tau_results: list, n: int):
         print(f"    Improvement: {improvement:+.1f}%")
 
 
-# ------------------------------------------------------------------ #
-#  Pick best episode (highest reward)                                 #
-# ------------------------------------------------------------------ #
+# Beste episode kiezen (hoogste reward)
 
 def best_result(results: list) -> dict:
     return max(results, key=lambda r: r["total_reward"])
 
 
-# ------------------------------------------------------------------ #
-#  Plot comparison figure                                             #
-# ------------------------------------------------------------------ #
+# Vergelijkingsfiguur plotten
 
 def plot_comparison(baseline_best: dict, tau_best: dict):
     """
@@ -324,9 +310,7 @@ def plot_comparison(baseline_best: dict, tau_best: dict):
     plt.show()
 
 
-# ------------------------------------------------------------------ #
-#  Entry point                                                         #
-# ------------------------------------------------------------------ #
+# Startpunt
 
 def load_model_and_env(model_path: str, norm_path: str, env_class):
     """Load a model + its normalised evaluation environment."""

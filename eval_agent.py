@@ -29,9 +29,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 from envs import DroneEnv2D
 
 
-# ------------------------------------------------------------------ #
-#  Configuration                                                       #
-# ------------------------------------------------------------------ #
+# Configuratie
 
 # Which model to load — prefer the best model saved by EvalCallback
 MODEL_PATH = "models/best/best_model.zip"
@@ -47,9 +45,7 @@ N_EVAL_EPISODES = 30
 RENDER_STEPS = False
 
 
-# ------------------------------------------------------------------ #
-#  Run one episode with the trained agent                             #
-# ------------------------------------------------------------------ #
+# Een episode uitvoeren met de getrainde agent
 
 def run_episode(model, vec_env, deterministic: bool = True) -> dict:
     """
@@ -118,9 +114,7 @@ def run_episode(model, vec_env, deterministic: bool = True) -> dict:
     }
 
 
-# ------------------------------------------------------------------ #
-#  Evaluate over N episodes and print statistics                      #
-# ------------------------------------------------------------------ #
+# Evalueren over N episodes en statistieken printen
 
 def evaluate(model, vec_env, n_episodes: int = N_EVAL_EPISODES):
 
@@ -166,9 +160,7 @@ def evaluate(model, vec_env, n_episodes: int = N_EVAL_EPISODES):
     return results, best_result
 
 
-# ------------------------------------------------------------------ #
-#  Plot the trajectory of the best episode                            #
-# ------------------------------------------------------------------ #
+# Traject van de beste episode plotten
 
 def plot_best_episode(result: dict):
 
@@ -246,9 +238,7 @@ def plot_best_episode(result: dict):
     plt.show()
 
 
-# ------------------------------------------------------------------ #
-#  Entry point                                                         #
-# ------------------------------------------------------------------ #
+# Startpunt
 
 if __name__ == "__main__":
 

@@ -158,9 +158,7 @@ def plot_trajectory(history: dict):
     plt.show()
 
 
-# --------------------------------------------------------------------------- #
-#  Entry point                                                                  #
-# --------------------------------------------------------------------------- #
+# Startpunt
 
 if __name__ == "__main__":
     history, total_reward = run_random_episode(seed=42)
