@@ -1,0 +1,48 @@
+\chapter{Introduction}
+\label{ch:introduction}
+
+Autonomous landing of unmanned aerial vehicles (UAVs) remains a safety-critical challenge
+in aerospace engineering.
+Unlike take-off, landing requires the vehicle to bring all translational velocities to zero
+simultaneously with altitude, leaving little margin for error in the terminal phase.
+Classical control approaches rely on precise sensor feedback and pre-programmed deceleration
+profiles \cite{flores2012}; however, biological fliers achieve reliable landing without
+explicit velocity sensors, using solely the optic flow available in the visual field.
+
+Honeybees (\emph{Apis mellifera}), hoverflies, and dragonflies are known to regulate their
+approach by keeping the rate of change of the \emph{tau} variable
+($\tau = z / |v_z|$, the optical time-to-contact) approximately constant at
+$\dot{\tau} \approx -0.5$ \cite{lee1976, wagner1982}.
+If this condition holds throughout descent, velocity decreases proportionally with altitude,
+guaranteeing a soft touchdown regardless of initial conditions \cite{lee1976}.
+This makes tau-regulation a robust, sensor-minimal, and provably safe landing
+strategy---properties highly desirable for autonomous UAVs.
+
+In parallel, deep reinforcement learning (RL) has demonstrated the ability to discover
+complex control strategies through environmental interaction alone \cite{schulman2017ppo}.
+A natural question is whether augmenting an RL agent with the biological percept $\tau$
+and a corresponding reward signal will (i)~improve landing quality and
+(ii)~induce tau-regulation behaviour similar to that observed in insects.
+
+This report investigates this question through the following contributions:
+\begin{enumerate}
+  \item A custom 2-D drone landing environment (\texttt{DroneEnvTau2D}) extending
+        OpenAI Gymnasium \cite{towers2024} with a tau observation and bio-inspired
+        shaping reward based on Lee's theory \cite{lee1976}.
+  \item A multi-seed experimental protocol quantifying the improvement in landing
+        performance and bio-inspired behaviour with statistical rigour (Wilcoxon
+        signed-rank test, bootstrap 95\% confidence intervals).
+  \item A zero-shot wind robustness evaluation showing that tau shaping preserves
+        landing quality under atmospheric disturbances the agent was never trained on.
+  \item A sensitivity analysis identifying the optimal reward shaping coefficient
+        governing the tau-regulation/task-success trade-off.
+\end{enumerate}
+
+The report is structured as follows.
+Chapter~\ref{ch:theory} introduces the theoretical background.
+Chapter~\ref{ch:method} describes the environment, agent, and training procedure.
+Chapter~\ref{ch:experiments} defines the experimental design.
+Chapter~\ref{ch:results} presents quantitative results.
+Chapter~\ref{ch:analysis} analyses the learned strategy.
+Chapter~\ref{ch:conclusion} concludes and discusses future work.
+The source code is publicly available at \url{https://github.com/stosvanlynden/insect-landing}.

@@ -1,0 +1,62 @@
+\chapter{Analysis of the Learned Strategy}
+\label{ch:analysis}
+
+\section{What the Baseline Agent Learned}
+\label{sec:anal_baseline}
+
+The baseline agent, observing only $(x,\, z,\, v_x,\, v_z)$, discovers a
+\emph{quasi-tau-regulation} strategy without any biological inductive bias.
+Figure~\ref{fig:tauhist} shows its $\dot{\tau}$ distribution peaking near $-0.7$,
+between the biological optimum ($-0.5$) and the constant-speed reference ($-1.0$).
+Its mean landing speed of 0.512~m/s is well within the safe threshold of 1.5~m/s.
+
+This outcome is structurally expected: any policy that smoothly brings $v_z$ to zero
+as $z$ approaches zero must exhibit approximately constant $\dot{\tau}$, since
+$\tau = z / |v_z|$ and both numerator and denominator vanish together.
+Minimising crash penalties while also minimising time is, in effect, isomorphic to a
+form of tau-regulation.
+
+\section{What Tau Shaping Adds}
+\label{sec:anal_tau}
+
+The tau agent exploits the explicit $\tau$ percept and the shaping signal to refine this
+strategy in two ways.
+First, the 5-D state provides a richer representation: the agent can directly read
+time-to-contact without estimating it from the ratio $z / |v_z|$, reducing the
+burden on the policy network.
+Second, the shaping reward (Equation~\ref{eq:tau_reward}) provides \emph{dense feedback}
+during every descent step, acting as a biological teacher signal that nudges
+$\dot{\tau}$ toward $-0.5$ even before the sparse task reward is received.
+This explains the modest training delay (13\%): the agent must reconcile two signal
+sources before committing to a policy.
+
+\section{The Time-Penalty / Tau-Regulation Trade-off}
+\label{sec:anal_tradeoff}
+
+Two competing objectives govern the tau agent's behaviour.
+The time penalty ($-0.3$/step) incentivises faster descent, pushing $\dot{\tau}$
+toward more negative values; the tau shaping pulls $\dot{\tau}$ toward $-0.5$,
+which requires a slower approach.
+The agent learns a compromise visible in Figure~\ref{fig:tauhist}: its mean
+$\dot{\tau}$ of $-1.59$ lies between the baseline's $-1.75$ and the biological
+target's $-0.5$.
+
+This trade-off also explains why the improvement in landing \emph{speed} (45\%) is
+larger than the improvement in $\dot{\tau}$ error (8.9\%).
+The final-approach phase (last 0.5~m of altitude) contributes disproportionately to
+$|v_z|$ at touchdown.
+The tau agent's moderately slower descent throughout the episode compounds into a
+substantially lower terminal velocity: a small, sustained deviation in the
+approach profile has a large effect on the contact speed.
+
+\section{Wind Robustness as an Emergent Property}
+\label{sec:anal_wind}
+
+The zero-shot wind robustness observed in Experiment C was not explicitly trained for.
+Both agents generalise because horizontal and vertical dynamics are largely decoupled in
+the physics model: the wind perturbation affects $v_x$ but not $v_z$ directly, and
+both agents learn aggressive $v_x$ correction from the crash penalty.
+The tau agent's persistent advantage in landing speed under wind confirms that
+tau-regulation is a \emph{structural property} of the learned policy---not a
+statistical artefact of specific training conditions---and that the bio-inspired
+inductive bias transfers robustly to out-of-distribution environments.

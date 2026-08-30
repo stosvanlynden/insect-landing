@@ -1,0 +1,139 @@
+\chapter{Methodology}
+\label{ch:method}
+
+\section{Base Environment: \texttt{DroneEnv2D}}
+\label{sec:env_base}
+
+The base environment models a point-mass drone in 2-D (horizontal position $x$,
+altitude $z$).
+The continuous state space is $\mathbf{s} = (x,\, z,\, v_x,\, v_z) \in \mathbb{R}^4$.
+The continuous action space is $\mathbf{a} = (a_x,\, a_z^{\text{thrust}})$, with
+$a_x \in [-5,\, 5]$~m/s$^2$ horizontal acceleration and
+$a_z^{\text{thrust}} \in [0,\, 20]$~m/s$^2$ an \emph{upward-only} thrust
+acceleration (the drone cannot thrust downward; gravity already provides that).
+The net vertical acceleration is $a_{z,\text{net}} = a_z^{\text{thrust}} - g$
+with $g = 9.81$~m/s$^2$, so $a_{z,\text{net}} \in [-9.81,\, 10.19]$~m/s$^2$.
+Dynamics are integrated with semi-implicit Euler steps at $\Delta t = 0.1$~s
+(velocities are updated first, then positions using the new velocities).
+
+The reward function combines four components:
+\begin{itemize}
+  \item \textbf{Safe-landing reward}: on touchdown ($z \leq 0$) with
+        $|v_z| \leq 3.0$~m/s, $|v_x| \leq 2.0$~m/s, and $|x| \leq 2.0$~m, the
+        agent receives
+        $100 \cdot (0.5\, s_x + 0.5\, s_v)$, where
+        $s_x = 1 - |x|/2.0$ and $s_v = 1 - |v_z|/3.0$ are position and speed
+        scores (maximum 100 for a perfectly centred, zero-speed touchdown).
+  \item \textbf{Graduated crash penalty}: if any threshold is exceeded on
+        touchdown, the agent instead receives
+        $-\bigl(5 + 3\max(0, |v_z|-3.0) + 2\max(0, |v_x|-2.0) +
+        1\max(0, |x|-2.0)\bigr)$, i.e.\ a base penalty plus a term
+        proportional to \emph{how far} each variable exceeds its threshold.
+        Flying out of bounds ($|x| > 30$~m or $z > 50$~m) incurs an additional
+        fixed penalty of $-10$.
+        This graduated design prevents the agent from discovering
+        ``hover-hacking'' solutions in which it lingers indefinitely to avoid
+        a fixed crash penalty.
+  \item \textbf{Time and thrust penalties} (every mid-flight step):
+        a constant $-0.3$/step, plus $-0.01 \cdot a_z^{\text{thrust}}$
+        rewarding energy-efficient (low-thrust) flight.
+  \item \textbf{Potential-based shaping} (Ng et al.~\cite{ng1999}, applied to
+        \emph{both} agents, mid-flight only):
+        $F(s,s') = \gamma\,\Phi(s') - \Phi(s)$ with $\gamma = 0.99$ and
+        $\Phi(s) = 2.0\bigl(1 - \min(|v_z|,20)/20\bigr) +
+                   0.5\bigl(1 - \min(|x|,30)/30\bigr)$.
+        This rewards \emph{progress} toward lower $|v_z|$ and $|x|$ without
+        rewarding a static hover, and is policy-invariant by construction
+        (Section~\ref{sec:shaping}).
+\end{itemize}
+
+An episode terminates when the drone reaches $z \leq 0$ or leaves the
+$|x| \leq 30$~m, $z \leq 50$~m box (both \emph{terminated}), or after
+500~steps (\emph{truncated}, timeout).
+Initial conditions are randomised at the start of each episode:
+$x_0 \sim \mathcal{U}(-8,\, 8)$~m, $z_0 \sim \mathcal{U}(3,\, 12)$~m,
+$v_x^0 \sim \mathcal{U}(-0.5,\, 0.5)$~m/s, $v_z^0 \sim \mathcal{U}(-0.5,\, 0.2)$~m/s
+--- i.e.\ the drone starts near-hover and must learn to descend, not just
+brake an existing fall.
+
+\section{Tau-Augmented Environment: \texttt{DroneEnvTau2D}}
+\label{sec:env_tau}
+
+The tau agent extends \texttt{DroneEnv2D} with two additions:
+
+\begin{enumerate}
+  \item \textbf{Tau observation.}
+        The time-to-contact $\tau = z / |v_z|$ (clipped to $[0,\, 100]$~s to avoid
+        division by zero) is appended to the state vector, giving a 5-D observation:
+        $\mathbf{s}_\tau = (x,\, z,\, v_x,\, v_z,\, \tau)$.
+        This directly provides the insect-inspired percept without requiring the agent
+        to estimate it from $z$ and $v_z$ separately.
+
+  \item \textbf{Tau-regulation shaping reward.}
+        During active descent ($v_z < -0.1$~m/s and $z > 0.5$~m), an additional
+        reward signal is computed:
+        %
+        \begin{equation}
+          r_\tau = -\lambda \cdot \min\!\left(\bigl(\dot{\tau} - \kappa\bigr)^2,\;
+          e_{\max}\right),
+          \label{eq:tau_reward}
+        \end{equation}
+        %
+        where $\dot{\tau} = (\tau_t - \tau_{t-1}) / \Delta t$ is the finite-difference
+        approximation of $\dot{\tau}$, $\kappa = -0.5$ is the biological target,
+        $\lambda = 0.10$ is the shaping coefficient (default), and $e_{\max} = 4.0$
+        clips large outliers that occur when $\tau$ changes rapidly near the ground.
+        Importantly, $\dot{\tau}$ is computed \emph{before} updating $\tau_{t-1}$;
+        inverting this order would cause $\dot{\tau} = 0$ at every step.
+\end{enumerate}
+
+\section{Training Setup}
+\label{sec:training}
+
+Both agents are trained using PPO as implemented in Stable-Baselines3
+\cite{raffin2021sb3}.
+Observations are normalised online using a running mean/variance estimator
+(\texttt{VecNormalize}, clip value 10).
+Table~\ref{tab:hyperparams} lists the shared hyperparameters.
+Each agent is trained from three independent random seeds (0, 1, 2) for
+$1\,000\,000$~timesteps using four parallel environments.
+The best checkpoint (by evaluation mean reward) is saved every $5\,000$ timesteps via
+\texttt{EvalCallback}.
+
+% ---- Table ----
+\begin{table}[h]
+  \centering
+  \caption{PPO hyperparameters, identical for both agents.}
+  \label{tab:hyperparams}
+  \begin{tabular}{ll}
+    \toprule
+    Hyperparameter             & Value \\
+    \midrule
+    Learning rate              & $3 \times 10^{-4}$ \\
+    Steps per update (rollout) & 2048 \\
+    Batch size                 & 64 \\
+    Optimisation epochs        & 10 \\
+    Discount factor $\gamma$   & 0.99 \\
+    GAE parameter $\lambda$    & 0.95 \\
+    Entropy coefficient        & 0.01 \\
+    Clip range $\varepsilon$   & 0.2 \\
+    Policy network             & MLP $[64,\, 64]$, \texttt{tanh} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Wind Disturbance Model}
+\label{sec:wind_model}
+
+To evaluate robustness, a horizontal wind disturbance is applied \emph{during evaluation
+only} (zero-shot transfer):
+%
+\begin{equation}
+  a_x \leftarrow \mathrm{clip}\!\left(a_x + \mathcal{U}(-w,\, w),\; -8,\; 8\right)
+  \quad [\text{m/s}^2],
+  \label{eq:wind}
+\end{equation}
+%
+where $w \in \{0.0,\, 0.5,\, 1.0,\, 1.5,\, 2.0\}$~m/s$^2$ is the disturbance magnitude
+and $\mathcal{U}(-w, w)$ is a uniform random perturbation applied each timestep.
+Neither agent was exposed to any wind disturbance during training.
