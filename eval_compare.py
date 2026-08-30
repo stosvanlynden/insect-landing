@@ -1,20 +1,20 @@
 """
 eval_compare.py
 ---------------
-Compares two trained PPO agents side-by-side:
-  - BASELINE : trained on DroneEnv2D (4D obs: [x, z, vx, vz])
-  - TAU AGENT: trained on DroneEnvTau2D (5D obs: [x, z, vx, vz, τ])
+Vergelijkt twee getrainde PPO-agents naast elkaar:
+  - BASELINE : getraind op DroneEnv2D (4D obs: [x, z, vx, vz])
+  - TAU AGENT: getraind op DroneEnvTau2D (5D obs: [x, z, vx, vz, τ])
 
-For BOTH agents we compute tau from the trajectory even if the agent did
-not observe it during training. This lets us answer the key question:
-  "Does the tau agent show more biological tau-regulation (dτ/dt ≈ -0.5)
-   compared to the baseline?"
+Voor BEIDE agents berekenen we tau uit het traject, ook als de agent het
+niet observeerde tijdens de training. Zo kunnen we de kernvraag beantwoorden:
+  "Vertoont de tau-agent meer biologische tau-regulatie (dτ/dt ≈ -0.5)
+   vergeleken met de baseline?"
 
 Output:
-  1. Side-by-side summary table (success rate, landing speed, etc.)
-  2. eval_compare.png — 6-panel figure comparing trajectories and tau profiles
+  1. Samenvattingstabel naast elkaar (succespercentage, landingssnelheid, enz.)
+  2. eval_compare.png — figuur met 6 panelen die trajecten en tau-profielen vergelijkt
 
-Run from insect_landing/ folder:
+Uitvoeren vanuit de map insect_landing/:
     python eval_compare.py
 """
 
@@ -47,12 +47,12 @@ N_EVAL_EPISODES = 30
 
 def compute_tau_profile(z_list: list, vz_list: list, dt: float = 0.1) -> tuple:
     """
-    Compute tau and dτ/dt for each step of a trajectory.
+    Berekent tau en dτ/dt voor elke stap van een traject.
 
-    tau = z / |vz|  (clipped to TAU_MAX when not descending)
-    tau_dot = finite-difference approximation of dτ/dt
+    tau = z / |vz|  (geclipt naar TAU_MAX als er niet gedaald wordt)
+    tau_dot = eindig-verschil-benadering van dτ/dt
 
-    Returns (tau_list, tau_dot_list) — same length as input.
+    Geeft (tau_list, tau_dot_list) terug — zelfde lengte als de input.
     """
     TAU_MAX = 100.0
     tau_list = []
@@ -64,7 +64,7 @@ def compute_tau_profile(z_list: list, vz_list: list, dt: float = 0.1) -> tuple:
             tau = TAU_MAX
         tau_list.append(tau)
 
-    # Finite-difference for dτ/dt; first point has no previous, set to NaN
+    # Eindig verschil voor dτ/dt; eerste punt heeft geen voorganger, wordt NaN
     tau_dot_list = [float("nan")]
     for i in range(1, len(tau_list)):
         tau_dot_list.append((tau_list[i] - tau_list[i - 1]) / dt)
@@ -76,10 +76,11 @@ def compute_tau_profile(z_list: list, vz_list: list, dt: float = 0.1) -> tuple:
 
 def run_episode(model, vec_env, env_class) -> dict:
     """
-    Run one deterministic episode and return the full trajectory.
+    Draait één deterministische episode en geeft het volledige traject terug.
 
-    Works for both DroneEnv2D (4D obs) and DroneEnvTau2D (5D obs).
-    Raw state is read from the info dict (real physical units, not normalised).
+    Werkt zowel voor DroneEnv2D (4D obs) als DroneEnvTau2D (5D obs).
+    De ruwe toestand wordt uit de info-dict gelezen (echte fysieke
+    eenheden, niet genormaliseerd).
     """
     obs    = vec_env.reset()
     history = {"x": [], "z": [], "vx": [], "vz": [], "step": []}
@@ -111,7 +112,7 @@ def run_episode(model, vec_env, env_class) -> dict:
                and abs(vz_f) <= env_class.LAND_VZ_THRESHOLD
                and abs(vx_f) <= env_class.LAND_VX_THRESHOLD)
 
-    # Compute tau profile from raw trajectory
+    # Tau-profiel berekenen uit het ruwe traject
     tau_list, tau_dot_list = compute_tau_profile(history["z"], history["vz"])
 
     return {
@@ -131,7 +132,7 @@ def run_episode(model, vec_env, env_class) -> dict:
 # N episodes evalueren voor een agent
 
 def evaluate_agent(model, vec_env, env_class, label: str, n: int = N_EVAL_EPISODES) -> list:
-    """Run n episodes and print per-episode results."""
+    """Draait n episodes en print de resultaten per episode."""
     print(f"\n{'-' * 60}")
     print(f"  {label}  ({n} episodes)")
     print(f"{'-' * 60}")
@@ -153,7 +154,7 @@ def evaluate_agent(model, vec_env, env_class, label: str, n: int = N_EVAL_EPISOD
 # Vergelijkingssamenvatting printen
 
 def print_summary(baseline_results: list, tau_results: list, n: int):
-    """Print a side-by-side comparison table."""
+    """Print een vergelijkingstabel van beide agents naast elkaar."""
 
     def stats(results):
         rewards   = [r["total_reward"]  for r in results]
@@ -194,11 +195,11 @@ def print_summary(baseline_results: list, tau_results: list, n: int):
 
     print("=" * 65)
 
-    # Tau-regulation quality: mean |dτ/dt - (-0.5)| over descent phases
+    # Kwaliteit van tau-regulatie: gemiddelde |dτ/dt - (-0.5)| tijdens het dalen
     def tau_reg_error(results):
         errors = []
         for r in results:
-            for td in r["tau_dot"][1:]:   # skip first NaN
+            for td in r["tau_dot"][1:]:   # eerste NaN overslaan
                 if not np.isnan(td) and not np.isinf(td) and abs(td) < 20:
                     errors.append(abs(td - (-0.5)))
         return np.mean(errors) if errors else float("nan")
@@ -223,12 +224,12 @@ def best_result(results: list) -> dict:
 
 def plot_comparison(baseline_best: dict, tau_best: dict):
     """
-    6-panel figure:
-      Row 1 (baseline): trajectory, tau(t), dτ/dt(t)
-      Row 2 (tau agent): same three panels
+    Figuur met 6 panelen:
+      Rij 1 (baseline): traject, tau(t), dτ/dt(t)
+      Rij 2 (tau agent): dezelfde drie panelen
 
-    The dτ/dt target (-0.5) is shown as a horizontal reference line.
-    A constant dτ/dt = -0.5 is the biological insect-landing signature.
+    Het dτ/dt-doel (-0.5) wordt getoond als een horizontale referentielijn.
+    Een constante dτ/dt = -0.5 is de biologische handtekening van insectenlanding.
     """
     fig = plt.figure(figsize=(15, 8))
     fig.suptitle(
@@ -254,7 +255,7 @@ def plot_comparison(baseline_best: dict, tau_best: dict):
         lbl     = labels[key]
         status  = "SAFE" if result["safe_landing"] else "CRASH"
 
-        # ---- Panel A: 2-D trajectory ----
+        # ---- Paneel A: 2D-traject ----
         ax_a = fig.add_subplot(gs[row, 0])
         n = len(x)
         path_colors = plt.cm.plasma(np.linspace(0, 1, max(n - 1, 1)))
@@ -271,9 +272,9 @@ def plot_comparison(baseline_best: dict, tau_best: dict):
         ax_a.legend(fontsize=7)
         ax_a.grid(True, linestyle="--", alpha=0.5)
 
-        # ---- Panel B: tau(t) ----
+        # ---- Paneel B: tau(t) ----
         ax_b = fig.add_subplot(gs[row, 1])
-        # Clip display to a readable range (exclude TAU_MAX filler)
+        # De weergave clippen tot een leesbaar bereik (TAU_MAX-opvulling weglaten)
         tau_display = [min(t, 30.0) for t in tau]
         ax_b.plot(steps, tau_display, color=col, linewidth=1.8)
         ax_b.set_xlabel("Step")
@@ -281,13 +282,13 @@ def plot_comparison(baseline_best: dict, tau_best: dict):
         ax_b.set_title(f"{lbl}\nτ = z / |vz|  over time")
         ax_b.grid(True, linestyle="--", alpha=0.5)
 
-        # Annotate: if tau decreases linearly → good bio-regulation
+        # Aantekening: als tau lineair afneemt → goede bio-regulatie
         ax_b.annotate("Ideal: linear τ↓", xy=(steps[len(steps)//3], tau_display[len(steps)//3]),
                       fontsize=7, color="grey", ha="center")
 
-        # ---- Panel C: dτ/dt(t) ----
+        # ---- Paneel C: dτ/dt(t) ----
         ax_c = fig.add_subplot(gs[row, 2])
-        # Filter outliers for display (huge values at hover transitions)
+        # Uitschieters filteren voor de weergave (enorme waarden bij hover-overgangen)
         td_display = [
             td if (not np.isnan(td) and abs(td) < 10) else float("nan")
             for td in tau_dot
@@ -313,7 +314,7 @@ def plot_comparison(baseline_best: dict, tau_best: dict):
 # Startpunt
 
 def load_model_and_env(model_path: str, norm_path: str, env_class):
-    """Load a model + its normalised evaluation environment."""
+    """Laadt een model + de bijbehorende genormaliseerde evaluatie-omgeving."""
     if not os.path.exists(model_path):
         return None, None
 
@@ -338,7 +339,7 @@ if __name__ == "__main__":
     print("  Tau-theory comparison: Baseline vs Tau agent")
     print("=" * 65)
 
-    # --- Load baseline ---
+    # --- Baseline laden ---
     print(f"\nLoading baseline model: {BASELINE_MODEL}")
     baseline_model, baseline_env = load_model_and_env(
         BASELINE_MODEL, BASELINE_NORM, DroneEnv2D
@@ -348,7 +349,7 @@ if __name__ == "__main__":
         print("  Run  python train_ppo.py  first.")
         sys.exit(1)
 
-    # --- Load tau agent ---
+    # --- Tau-agent laden ---
     print(f"Loading tau model     : {TAU_MODEL}")
     tau_model, tau_env = load_model_and_env(
         TAU_MODEL, TAU_NORM, DroneEnvTau2D
@@ -358,7 +359,7 @@ if __name__ == "__main__":
         print("  Run  python train_ppo_tau.py  first.")
         sys.exit(1)
 
-    # --- Evaluate both agents ---
+    # --- Beide agents evalueren ---
     baseline_results = evaluate_agent(baseline_model, baseline_env, DroneEnv2D,
                                       "BASELINE (4D obs, no tau shaping)",
                                       n=N_EVAL_EPISODES)
@@ -367,10 +368,10 @@ if __name__ == "__main__":
                                       "TAU AGENT (5D obs, tau-regulation shaping)",
                                       n=N_EVAL_EPISODES)
 
-    # --- Print summary ---
+    # --- Samenvatting printen ---
     print_summary(baseline_results, tau_results, N_EVAL_EPISODES)
 
-    # --- Plot comparison ---
+    # --- Vergelijking plotten ---
     b_best = best_result(baseline_results)
     t_best = best_result(tau_results)
 

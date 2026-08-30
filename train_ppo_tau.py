@@ -1,18 +1,18 @@
 """
 train_ppo_tau.py
 ----------------
-Trains a PPO agent on DroneEnvTau2D (the tau-augmented environment).
+Traint een PPO-agent op DroneEnvTau2D (de tau-verrijkte omgeving).
 
-Differences compared to train_ppo.py (baseline):
-  - Uses DroneEnvTau2D instead of DroneEnv2D
-    → observation is 5D: [x, z, vx, vz, tau]
-    → tau-regulation shaping reward guides agent toward dτ/dt ≈ -0.5
-  - Saves to models_tau/ instead of models/ (to avoid overwriting the baseline)
-  - ALWAYS starts fresh (no resume from baseline — different observation space!)
+Verschillen met train_ppo.py (baseline):
+  - Gebruikt DroneEnvTau2D in plaats van DroneEnv2D
+    → observatie is 5D: [x, z, vx, vz, tau]
+    → tau-regulatie shaping-reward stuurt de agent richting dτ/dt ≈ -0.5
+  - Slaat op in models_tau/ in plaats van models/ (om de baseline niet te overschrijven)
+  - Begint ALTIJD opnieuw (geen doorstart vanaf de baseline — andere observatieruimte!)
 
-After training, run eval_compare.py to compare this agent with the baseline.
+Draai na het trainen eval_compare.py om deze agent met de baseline te vergelijken.
 
-Run from insect_landing/ folder:
+Uitvoeren vanuit de map insect_landing/:
     python train_ppo_tau.py
 """
 
@@ -38,7 +38,7 @@ from envs import DroneEnvTau2D
 # Aangepaste callback: print elke N stappen een voortgangsregel
 
 class ProgressCallback(BaseCallback):
-    """Prints training progress without needing TensorBoard."""
+    """Print de trainingsvoortgang, zonder dat TensorBoard nodig is."""
 
     def __init__(self, print_every: int = 10_000, verbose: int = 0):
         super().__init__(verbose)
@@ -89,7 +89,7 @@ def train():
     print(f"  Model save path   : {MODEL_DIR}/{MODEL_NAME}_final.zip")
     print("=" * 65)
 
-    # --- Training environment ---
+    # --- Trainingsomgeving ---
     train_env = make_vec_env(
         DroneEnvTau2D,
         n_envs=N_ENVS,
@@ -97,9 +97,9 @@ def train():
         wrapper_class=Monitor,
     )
 
-    # VecNormalize: normalise observations (all 5D) and rewards.
-    # We ALWAYS start fresh for the tau model — the baseline's vec_normalize.pkl
-    # has 4D statistics and cannot be reused here.
+    # VecNormalize: normaliseert observaties (alle 5D) en rewards.
+    # We beginnen voor het tau-model ALTIJD opnieuw — de vec_normalize.pkl
+    # van de baseline heeft 4D-statistieken en kan hier niet hergebruikt worden.
     norm_path = os.path.join(MODEL_DIR, "vec_normalize.pkl")
     if os.path.exists(norm_path):
         print(f"  Resuming normalisation stats from: {norm_path}")
@@ -110,15 +110,15 @@ def train():
         print("  Starting fresh normalisation stats.\n")
         train_env = VecNormalize(train_env, norm_obs=True, norm_reward=True, clip_obs=10.0)
 
-    # --- Evaluation environment ---
+    # --- Evaluatie-omgeving ---
     eval_env = make_vec_env(DroneEnvTau2D, n_envs=1, seed=99, wrapper_class=Monitor)
     eval_env = VecNormalize(eval_env, norm_obs=True, norm_reward=False, clip_obs=10.0,
                             training=False)
     eval_env.obs_rms = train_env.obs_rms
 
-    # --- Load or create model ---
-    # The tau model CANNOT resume from the 4D baseline model.
-    # Only resume if a previous tau training run exists.
+    # --- Model laden of aanmaken ---
+    # Het tau-model kan NIET doorstarten vanaf het 4D baseline-model.
+    # Alleen doorstarten als er al een eerdere tau-trainingsrun bestaat.
     best_model_path  = os.path.join(MODEL_DIR, "best", "best_model.zip")
     final_model_path = os.path.join(MODEL_DIR, f"{MODEL_NAME}_final.zip")
 
@@ -130,8 +130,8 @@ def train():
         model = PPO.load(final_model_path, env=train_env, seed=42)
     else:
         print("  No saved tau model — starting fresh.\n")
-        # Same hyperparameters as the baseline for a fair comparison.
-        # The only differences are the environment (5D obs) and the tau shaping reward.
+        # Zelfde hyperparameters als de baseline, voor een eerlijke vergelijking.
+        # De enige verschillen zijn de omgeving (5D obs) en de tau-shaping-reward.
         model = PPO(
             policy="MlpPolicy",
             env=train_env,
@@ -143,7 +143,7 @@ def train():
             gae_lambda=0.95,
             ent_coef=0.01,
             clip_range=0.2,
-            policy_kwargs=dict(net_arch=[64, 64]),  # same architecture as baseline
+            policy_kwargs=dict(net_arch=[64, 64]),  # zelfde architectuur als de baseline
             tensorboard_log=None,
             verbose=0,
             seed=42,
@@ -171,7 +171,7 @@ def train():
 
     progress_cb = ProgressCallback(print_every=10_000)
 
-    # --- Train ---
+    # --- Trainen ---
     print("Starting training...\n")
     model.learn(
         total_timesteps=TOTAL_TIMESTEPS,
@@ -179,7 +179,7 @@ def train():
         progress_bar=False,
     )
 
-    # --- Save final model + normalisation stats ---
+    # --- Eindmodel + normalisatiestatistieken opslaan ---
     final_path = os.path.join(MODEL_DIR, f"{MODEL_NAME}_final")
     model.save(final_path)
     train_env.save(norm_path)

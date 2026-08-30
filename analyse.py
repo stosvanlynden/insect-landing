@@ -1,22 +1,22 @@
 """
 analyse.py
 ----------
-Master analysis script: reads all experiment data, runs statistics,
-and produces all figures for the AE4350 report.
+Hoofd-analysescript: leest alle experimentdata in, draait statistiek,
+en produceert alle figuren voor het AE4350-verslag.
 
-Figures produced (saved to results/figures/):
-  fig1_learning_curves.png   -- reward + touchdown speed vs timesteps
-  fig2_boxplots.png          -- touchdown speed + tau-error, paired per seed
-  fig3_tau_histogram.png     -- dtau/dt distribution, baseline vs tau
-  fig4_wind_robustness.png   -- success rate + landing speed vs wind
-  fig5_sensitivity.png       -- touchdown speed + tau-error vs shaping coeff
+Geproduceerde figuren (opgeslagen in results/figures/):
+  fig1_learning_curves.png   -- reward + landingssnelheid vs tijdstappen
+  fig2_boxplots.png          -- landingssnelheid + tau-fout, gepaard per seed
+  fig3_tau_histogram.png     -- dtau/dt-verdeling, baseline vs tau
+  fig4_wind_robustness.png   -- succespercentage + landingssnelheid vs wind
+  fig5_sensitivity.png       -- landingssnelheid + tau-fout vs shaping-coëfficiënt
 
-Statistics printed to console:
-  - Wilcoxon signed-rank test on touchdown speed (paired by episode)
-  - Bootstrap 95% confidence intervals for all key metrics
-  - Summary table for the report
+Statistiek die naar de console wordt geprint:
+  - Wilcoxon signed-rank test op landingssnelheid (gepaard per episode)
+  - Bootstrap 95%-betrouwbaarheidsintervallen voor alle kernmetrics
+  - Samenvattingstabel voor het verslag
 
-Run from insect_landing/ folder:
+Uitvoeren vanuit de map insect_landing/:
     python analyse.py
 """
 
@@ -38,7 +38,7 @@ from envs import DroneEnv2D, DroneEnvTau2D
 
 SEEDS        = [0, 1, 2]
 COEFFS       = [0.00, 0.02, 0.05, 0.10, 0.20, 0.50]
-N_EVAL_EPS   = 30   # paired episodes for box-plot stats
+N_EVAL_EPS   = 30   # gepaarde episodes voor de boxplot-statistiek
 FIG_DIR      = os.path.join("results", "figures")
 os.makedirs(FIG_DIR, exist_ok=True)
 os.makedirs("results", exist_ok=True)
@@ -98,7 +98,7 @@ def compute_tau_error_traj(z_list, vz_list, dt=0.1):
     return float(np.mean(errors)) if errors else float("nan")
 
 def collect_dtau_samples(z_list, vz_list, dt=0.1):
-    """Return all individual dtau/dt values (for histogram)."""
+    """Geeft alle individuele dtau/dt-waarden terug (voor het histogram)."""
     samples, tau_prev = [], None
     for z, vz in zip(z_list, vz_list):
         if vz < -0.1 and z > 0.5:
@@ -114,22 +114,22 @@ def collect_dtau_samples(z_list, vz_list, dt=0.1):
 
 def run_paired_eval(model_b, env_b, model_t, env_t, n=N_EVAL_EPS):
     """
-    Run n episodes on BOTH agents with the same start conditions.
-    Returns paired arrays of touchdown speeds and tau-errors.
+    Draait n episodes voor BEIDE agents met dezelfde startcondities.
+    Geeft gepaarde arrays van landingssnelheden en tau-fouten terug.
     """
     vz_b, vz_t = [], []
     te_b, te_t = [], []
     dtau_b_all, dtau_t_all = [], []
 
     for ep in range(n):
-        ep_seed = ep * 7 + 13   # deterministic per episode index
+        ep_seed = ep * 7 + 13   # deterministisch per episode-index
 
         for model, vec_env, vz_list_out, te_list_out, dtau_out in [
             (model_b, env_b, vz_b, te_b, dtau_b_all),
             (model_t, env_t, vz_t, te_t, dtau_t_all),
         ]:
             obs = vec_env.reset()
-            # Set the underlying env seed for paired start conditions
+            # De onderliggende env-seed zetten voor gepaarde startcondities
             try:
                 vec_env.env_method("reset", seed=ep_seed)
                 obs = vec_env.reset()
@@ -178,7 +178,7 @@ def read_learning_csv(path):
     return rows
 
 def learning_mean_std(agent, seeds, coeff=0.10):
-    """Return (timesteps, mean_metric, std_metric) arrays from multiple seed CSVs."""
+    """Geeft (timesteps, mean_metric, std_metric) arrays terug uit meerdere seed-CSV's."""
     all_data = []
     for s in seeds:
         data = read_learning_csv(log_path(agent, s, coeff))
@@ -187,12 +187,12 @@ def learning_mean_std(agent, seeds, coeff=0.10):
     if not all_data:
         return None, None, None
 
-    # Align on timestep index (all CSVs should have same length)
+    # Uitlijnen op de timestep-index (alle CSV's zouden dezelfde lengte moeten hebben)
     min_len = min(len(d) for d in all_data)
     timesteps = np.array([r["timestep"] for r in all_data[0][:min_len]])
 
     for metric in ["mean_vz", "success_rate"]:
-        pass   # will extract in plot function
+        pass   # wordt in de plotfunctie geëxtraheerd
 
     return all_data, timesteps, min_len
 
@@ -209,7 +209,7 @@ def fig_learning_curves():
     colors = {"baseline": "royalblue", "tau": "darkorange"}
     labels = {"baseline": "Baseline (4D)", "tau": "Tau agent (5D)"}
 
-    stored = {}  # keep mean arrays for annotation
+    stored = {}  # bewaart de gemiddelde arrays voor annotatie
 
     for metric, ax, ylabel, title in [
         ("mean_vz",      axes[0], "Mean touchdown |vz| (m/s)",  "Landing speed during training"),
@@ -229,7 +229,7 @@ def fig_learning_curves():
             stored[(metric, agent)] = (timesteps, mean)
 
         if metric == "mean_vz":
-            # Zoom into the interesting convergence region
+            # Inzoomen op het interessante convergentiegebied
             ax.set_ylim(0, 4)
 
         if metric == "success_rate":
@@ -237,12 +237,12 @@ def fig_learning_curves():
             ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f"{y:.0%}"))
             ax.axhline(1.0, color="grey", linewidth=0.8, linestyle=":")
 
-            # Annotate the learning delay: find where each agent first exceeds 80%
+            # De leervertraging annoteren: zoeken waar elke agent voor het eerst boven 80% komt
             threshold = 0.80
-            # Separate text positions so labels don't overlap
+            # Tekstposities uit elkaar houden zodat labels niet overlappen
             annot_offsets = {
-                "baseline": (-0.08, -0.17),  # left of the line, lower
-                "tau":      ( 0.06, -0.08),  # right of the line, higher
+                "baseline": (-0.08, -0.17),  # links van de lijn, lager
+                "tau":      ( 0.06, -0.08),  # rechts van de lijn, hoger
             }
             for agent, color in colors.items():
                 key = (metric, agent)
@@ -279,7 +279,7 @@ def fig_learning_curves():
 def fig_boxplots_and_stats():
     print("\nGenerating Fig 2: Box plots + statistics...")
 
-    # Collect paired results across all seeds
+    # Gepaarde resultaten over alle seeds verzamelen
     all_vz_b, all_vz_t = [], []
     all_te_b, all_te_t = [], []
     all_dtau_b, all_dtau_t = [], []
@@ -303,14 +303,14 @@ def fig_boxplots_and_stats():
     all_te_b = np.array([x for x in all_te_b if not np.isnan(x)])
     all_te_t = np.array([x for x in all_te_t if not np.isnan(x)])
 
-    # ---- Statistics ----
+    # ---- Statistiek ----
     print("\n" + "=" * 60)
     print("  STATISTICAL RESULTS")
     print("=" * 60)
 
-    # Wilcoxon signed-rank test (paired)
+    # Wilcoxon signed-rank test (gepaard)
     stat_vz, p_vz = stats.wilcoxon(all_vz_b[:len(all_vz_t)], all_vz_t[:len(all_vz_b)])
-    r_vz = stat_vz / np.sqrt(len(all_vz_b) * (len(all_vz_b) + 1) / 2)   # effect size r
+    r_vz = stat_vz / np.sqrt(len(all_vz_b) * (len(all_vz_b) + 1) / 2)   # effectgrootte r
 
     ci_b = bootstrap_ci(all_vz_b)
     ci_t = bootstrap_ci(all_vz_t)
@@ -333,7 +333,7 @@ def fig_boxplots_and_stats():
 
     ci_teb = bootstrap_ci(all_te_b)
     ci_tet = bootstrap_ci(all_te_t)
-    # Wilcoxon for tau-error (paired, same length)
+    # Wilcoxon voor de tau-fout (gepaard, zelfde lengte)
     n_te = min(len(all_te_b), len(all_te_t))
     stat_te, p_te = stats.wilcoxon(all_te_b[:n_te], all_te_t[:n_te])
     if p_te < 0.001:
@@ -361,7 +361,7 @@ def fig_boxplots_and_stats():
 
     colors_box = ["royalblue", "darkorange"]
 
-    # Touchdown speed
+    # Landingssnelheid
     ax1 = axes[0]
     bp = ax1.boxplot([all_vz_b, all_vz_t],
                      tick_labels=["Baseline\n(4D obs)", "Tau agent\n(5D obs)"],
@@ -372,18 +372,18 @@ def fig_boxplots_and_stats():
     ax1.axhline(DroneEnv2D.LAND_VZ_THRESHOLD, color="red", linewidth=1.0,
                 linestyle="--", alpha=0.6, label=f"Safe limit ({DroneEnv2D.LAND_VZ_THRESHOLD} m/s)")
     ax1.set_ylabel("Touchdown |vz| (m/s)")
-    ax1.set_ylim(0, 1.2)   # zoom in — all data is below 1.1 m/s
+    ax1.set_ylim(0, 1.2)   # inzoomen — alle data ligt onder 1.1 m/s
     ax1.set_title(f"Landing speed\n(Wilcoxon {sig})")
     ax1.legend(fontsize=8)
     ax1.grid(True, axis="y", linestyle="--", alpha=0.4)
 
-    # Add mean annotations
+    # Gemiddelde-annotaties toevoegen
     for i, (data, color) in enumerate(zip([all_vz_b, all_vz_t], colors_box), 1):
         ax1.annotate(f"mean={np.mean(data):.3f}", xy=(i, np.mean(data)),
                      ha="center", va="bottom", fontsize=8, color=color,
                      xytext=(0, 5), textcoords="offset points")
 
-    # Tau-regulation error
+    # Tau-regulatiefout
     ax2 = axes[1]
     bp2 = ax2.boxplot([all_te_b, all_te_t],
                       tick_labels=["Baseline\n(4D obs)", "Tau agent\n(5D obs)"],
@@ -391,7 +391,7 @@ def fig_boxplots_and_stats():
                       medianprops=dict(color="black", linewidth=2))
     for patch, color in zip(bp2["boxes"], colors_box):
         patch.set_facecolor(color); patch.set_alpha(0.7)
-    # No "perfect regulation" line — it sets an unrealistic expectation
+    # Geen "perfecte regulatie"-lijn — dat wekt een onrealistische verwachting
     ax2.set_ylabel("|dtau/dt - (-0.5)|")
     ax2.set_title(f"Tau-regulation error\n(lower = more bio-inspired)\n"
                   f"Improvement: {improvement:+.1f}%  ({sig_te})")
@@ -415,7 +415,7 @@ def fig_tau_histogram(dtau_b, dtau_t):
                  "Biological target: dtau/dt = -0.5 (grey dashed)",
                  fontsize=12, fontweight="bold")
 
-    # Trim x-axis to -5 to 1.0 — positive range is nearly empty
+    # X-as beperken tot -5 tot 1.0 — het positieve bereik is bijna leeg
     bins = np.linspace(-5, 1.0, 55)
 
     m_b = np.mean(dtau_b); m_t = np.mean(dtau_t)
@@ -435,11 +435,11 @@ def fig_tau_histogram(dtau_b, dtau_t):
     ax.set_xlabel("dtau/dt  (s/s)")
     ax.set_ylabel("Density")
     ax.set_xlim(-5, 1.0)
-    # Legend outside plot — prevents overlap with histogram bars
+    # Legenda buiten de plot — voorkomt overlap met de histogrambalken
     ax.legend(fontsize=8.5, loc="upper left", framealpha=0.9)
     ax.grid(True, linestyle="--", alpha=0.4)
 
-    # Annotation explaining why both agents are far from -0.5
+    # Annotatie die uitlegt waarom beide agents ver van -0.5 afzitten
     ax.annotate("Note: time penalty (-0.3/step)\npushes agents to land quickly,\ncompeting with tau-regulation",
                 xy=(-0.5, 0.6), xytext=(-4.5, 0.7),
                 fontsize=7.5, color="dimgrey",
@@ -478,7 +478,7 @@ def fig_wind_robustness():
     colors = {"baseline": "royalblue", "tau": "darkorange"}
     labels = {"baseline": "Baseline", "tau": "Tau agent"}
 
-    # Right panel wider: it tells the main story (landing quality under wind)
+    # Rechterpaneel breder: dat vertelt het hoofdverhaal (landingskwaliteit onder wind)
     fig, axes = plt.subplots(1, 2, figsize=(13, 5),
                              gridspec_kw={"width_ratios": [2, 3]})
     fig.suptitle("Wind stability: tau agent maintains landing quality under wind disturbances\n"
@@ -504,7 +504,7 @@ def fig_wind_robustness():
                             color=colors[agent], alpha=0.18)
 
         if idx == 0:
-            # Zoom y-axis: both are flat at 100%, show this clearly
+            # Y-as inzoomen: beide liggen vlak rond 100%, dat duidelijk laten zien
             ax.set_ylim(0.88, 1.03)
             ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f"{y:.0%}"))
             ax.axhline(1.0, color="grey", linewidth=0.8, linestyle=":")
@@ -537,11 +537,11 @@ def fig_sensitivity():
         for seed in SEEDS:
             model_path, norm_path = tau_paths(seed, coeff)
             if coeff == 0.10:
-                # The coeff=0.10 folders are the main-experiment runs (trained
-                # to 1M steps), so "best_model.zip" is not comparable to the
-                # other coefficients' 500k-step-only runs. Use the checkpoint
-                # saved at exactly 500k steps instead, for a fair
-                # matched-budget point.
+                # De coeff=0.10-mappen zijn de hoofdexperiment-runs (getraind
+                # tot 1M stappen), dus "best_model.zip" is niet vergelijkbaar
+                # met de andere coëfficiënten (alleen 500k stappen). Gebruik
+                # in plaats daarvan het checkpoint op precies 500k stappen,
+                # voor een eerlijk vergelijkingspunt met gelijk budget.
                 matched_ckpt = os.path.join(
                     "models_tau", f"seed_{seed}", "coeff_0p10",
                     f"ckpt_tau_s{seed}_500000_steps.zip")
@@ -616,9 +616,9 @@ def fig_sensitivity():
         ax.errorbar(coeffs, means, yerr=stds, fmt="o-", color=color,
                     linewidth=2, markersize=8, capsize=4, elinewidth=1.5)
 
-        # Mark the coefficient used in the main experiments (0.10) -- this
-        # is the value actually trained with multi-seed, NOT necessarily the
-        # single-seed empirical minimum shown here (see report Discussion).
+        # De coëfficiënt uit de hoofdexperimenten markeren (0.10) -- dit is de
+        # waarde die daadwerkelijk multi-seed is getraind, NIET per se het
+        # empirische minimum hier (zie de Discussion in het verslag).
         if 0.10 in coeffs:
             idx = coeffs.index(0.10)
             ax.axvline(0.10, color="grey", linewidth=1.2, linestyle="--", alpha=0.7,
@@ -647,19 +647,19 @@ if __name__ == "__main__":
     print("  AE4350 Analysis — generating all figures + statistics")
     print("=" * 65)
 
-    # Fig 1: learning curves (no model loading needed)
+    # Fig 1: leercurves (geen model nodig)
     fig_learning_curves()
 
-    # Fig 2: box plots + statistical tests (loads all 6 models)
+    # Fig 2: boxplots + statistische toetsen (laadt alle 6 modellen)
     dtau_b, dtau_t = fig_boxplots_and_stats()
 
-    # Fig 3: dtau/dt histogram (uses data from Fig 2 evaluation)
+    # Fig 3: dtau/dt-histogram (gebruikt data uit de Fig 2-evaluatie)
     fig_tau_histogram(dtau_b, dtau_t)
 
-    # Fig 4: wind robustness (reads results/wind_robustness.csv)
+    # Fig 4: windrobuustheid (leest results/wind_robustness.csv)
     fig_wind_robustness()
 
-    # Fig 5: sensitivity (loads 6 sensitivity models)
+    # Fig 5: sensitiviteit (laadt de sensitiviteitsmodellen)
     fig_sensitivity()
 
     print("\n" + "=" * 65)
@@ -671,5 +671,5 @@ if __name__ == "__main__":
     print("  fig4_wind_robustness.png  <- Fig 5 in report (robustness)")
     print("  fig5_sensitivity.png      <- Fig 6 in report (sensitivity)")
 
-    # Open all 5 figures simultaneously
+    # Alle 5 figuren tegelijk openen
     plt.show()

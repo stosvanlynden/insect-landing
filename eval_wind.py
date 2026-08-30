@@ -1,20 +1,21 @@
 """
 eval_wind.py
 ------------
-Experiment C: zero-shot wind robustness evaluation.
+Experiment C: zero-shot windrobuustheid-evaluatie.
 
-Both agents were trained WITHOUT wind.  Here we evaluate them under
-increasing wind disturbances to test which agent degrades more gracefully.
+Beide agents zijn getraind ZONDER wind. Hier evalueren we ze onder
+toenemende windverstoring om te zien welke agent het meest geleidelijk
+achteruitgaat.
 
-Wind model: each step, a random horizontal acceleration in
-            [-wind_force, +wind_force] m/s² is added to the agent's
-            commanded ax.  This simulates atmospheric turbulence.
+Windmodel: elke stap wordt een willekeurige horizontale versnelling in
+           [-wind_force, +wind_force] m/s² opgeteld bij de door de agent
+           gecommandeerde ax. Dit simuleert atmosferische turbulentie.
 
-Loads all seeds (0, 1, 2) for each agent and evaluates 50 episodes
-per wind level per seed.  Results are saved to:
+Laadt alle seeds (0, 1, 2) voor elke agent en evalueert 50 episodes
+per windniveau per seed. Resultaten worden opgeslagen in:
     results/wind_robustness.csv
 
-Run from insect_landing/ folder:
+Uitvoeren vanuit de map insect_landing/:
     python eval_wind.py
 """
 
@@ -34,8 +35,8 @@ from envs import DroneEnv2D, DroneEnvTau2D
 # Configuratie
 
 SEEDS          = [0, 1, 2]
-WIND_LEVELS    = [0.0, 0.5, 1.0, 1.5, 2.0]   # m/s² disturbance magnitude
-N_EPISODES     = 50                            # per seed per wind level
+WIND_LEVELS    = [0.0, 0.5, 1.0, 1.5, 2.0]   # m/s² verstoringsgrootte
+N_EPISODES     = 50                            # per seed per windniveau
 
 BASELINE_MODEL_TEMPLATE = os.path.join("models",     "seed_{seed}", "best", "best_model.zip")
 BASELINE_NORM_TEMPLATE  = os.path.join("models",     "seed_{seed}", "vec_normalize.pkl")
@@ -50,8 +51,8 @@ OUTPUT_FILE = os.path.join(OUTPUT_DIR, "wind_robustness.csv")
 
 def evaluate_wind(model, vec_env, env_class, n_episodes: int, seed_offset: int = 0):
     """
-    Run n_episodes with a fixed env seed for reproducibility.
-    Returns (success_rate, mean_touchdown_vz).
+    Voert n_episodes uit met een vaste env-seed, voor reproduceerbaarheid.
+    Geeft (succespercentage, gemiddelde_landings_vz) terug.
     """
     successes   = []
     vz_landings = []
@@ -91,13 +92,13 @@ def evaluate_wind(model, vec_env, env_class, n_episodes: int, seed_offset: int =
 # Hoofdprogramma
 
 def load_model_with_norm(model_path, norm_path, env_class, wind_force):
-    """Load a trained model with a wind-disturbance eval environment."""
+    """Laadt een getraind model met een eval-omgeving die windverstoring bevat."""
     if not os.path.exists(model_path):
         return None, None
 
     model   = PPO.load(model_path)
 
-    # Create environment with the desired wind level
+    # Omgeving aanmaken met het gewenste windniveau
     if env_class == DroneEnv2D:
         raw_env = DummyVecEnv([lambda wf=wind_force: DroneEnv2D(wind_force=wf)])
     else:
@@ -124,7 +125,7 @@ if __name__ == "__main__":
     print(f"  Episodes per condition: {N_EPISODES}")
     print("=" * 65)
 
-    rows = []  # will be written to CSV
+    rows = []  # wordt weggeschreven naar CSV
 
     for agent_label, model_tmpl, norm_tmpl, env_class in [
         ("baseline", BASELINE_MODEL_TEMPLATE, BASELINE_NORM_TEMPLATE, DroneEnv2D),
@@ -164,7 +165,7 @@ if __name__ == "__main__":
                     "n_episodes":   N_EPISODES,
                 })
 
-    # Write CSV
+    # CSV wegschrijven
     if rows:
         fieldnames = ["agent", "seed", "wind_force", "success_rate", "mean_vz", "n_episodes"]
         with open(OUTPUT_FILE, "w", newline="") as f:

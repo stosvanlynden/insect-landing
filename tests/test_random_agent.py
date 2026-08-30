@@ -1,21 +1,21 @@
 """
 test_random_agent.py
 --------------------
-Runs ONE episode of DroneEnv2D with a purely random agent and then
-plots the full trajectory so you can visually verify that the physics
-and reward function look sensible.
+Draait ÉÉN episode van DroneEnv2D met een puur willekeurige agent en
+plot daarna het volledige traject, zodat je visueel kan checken of de
+natuurkunde en de rewardfunctie logisch aanvoelen.
 
-Run from the insect_landing/ folder:
+Uitvoeren vanuit de map insect_landing/:
     python -m tests.test_random_agent
-or simply:
+of simpelweg:
     python tests/test_random_agent.py
 """
 
 import sys
 import os
 
-# Make sure the package root (insect_landing/) is on the Python path
-# so that 'from envs import DroneEnv2D' works regardless of how you run this.
+# Zorg dat de projectroot (insect_landing/) op het Python-pad staat,
+# zodat 'from envs import DroneEnv2D' werkt, ongeacht hoe je dit uitvoert.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import numpy as np
@@ -27,26 +27,26 @@ from envs import DroneEnv2D
 
 def run_random_episode(seed: int = 42):
     """
-    Creates the environment, resets it, then steps through one episode
-    using random actions sampled from the action space.
+    Maakt de omgeving aan, reset hem, en doorloopt dan één episode met
+    willekeurige acties uit de actieruimte.
 
     Returns
     -------
-    history : dict with lists of recorded values per step
-    total_reward : float — sum of all rewards in the episode
+    history : dict met lijsten van geregistreerde waarden per stap
+    total_reward : float — som van alle rewards in de episode
     """
 
     env = DroneEnv2D()
     obs, _ = env.reset(seed=seed)
 
-    # Storage for trajectory data
+    # Opslag voor trajectgegevens
     history = {
         "x":      [],
         "z":      [],
         "vx":     [],
         "vz":     [],
-        "ax":     [],       # action: horizontal acceleration
-        "az":     [],       # action: vertical thrust acceleration
+        "ax":     [],       # actie: horizontale versnelling
+        "az":     [],       # actie: verticale stuwkracht-versnelling
         "reward": [],
         "step":   [],
     }
@@ -56,13 +56,13 @@ def run_random_episode(seed: int = 42):
     truncated    = False
 
     while not (terminated or truncated):
-        # Sample a completely random action from the action space
+        # Een volledig willekeurige actie trekken uit de actieruimte
         action = env.action_space.sample()
 
-        # Step the environment
+        # De omgeving één stap verder zetten
         obs, reward, terminated, truncated, info = env.step(action)
 
-        # Record everything for plotting
+        # Alles registreren om te kunnen plotten
         history["x"].append(info["x"])
         history["z"].append(info["z"])
         history["vx"].append(info["vx"])
@@ -87,11 +87,11 @@ def run_random_episode(seed: int = 42):
 
 def plot_trajectory(history: dict):
     """
-    Produces a 4-panel figure:
-      1. 2-D flight path  (x vs z)
-      2. Height over time (z vs step)
-      3. Velocities over time (vx and vz vs step)
-      4. Reward over time
+    Maakt een figuur met 4 panelen:
+      1. 2D-vluchtpad (x vs z)
+      2. Hoogte over tijd (z vs step)
+      3. Snelheden over tijd (vx en vz vs step)
+      4. Reward over tijd
     """
 
     steps   = history["step"]
@@ -104,12 +104,12 @@ def plot_trajectory(history: dict):
     fig, axes = plt.subplots(2, 2, figsize=(12, 8))
     fig.suptitle("DroneEnv2D — Random Agent Trajectory", fontsize=14, fontweight="bold")
 
-    # ---- Panel 1: 2-D spatial trajectory (x vs z) ----
+    # ---- Paneel 1: 2D-traject in de ruimte (x vs z) ----
     ax1 = axes[0, 0]
     ax1.plot(x, z, color="steelblue", linewidth=1.5, label="flight path")
-    ax1.plot(x[0],  z[0],  "go", markersize=10, label="start")   # green = start
-    ax1.plot(x[-1], z[-1], "rs", markersize=10, label="end")     # red   = end
-    # Draw the landing pad target
+    ax1.plot(x[0],  z[0],  "go", markersize=10, label="start")   # groen = start
+    ax1.plot(x[-1], z[-1], "rs", markersize=10, label="end")     # rood  = einde
+    # Het landingsvlak tekenen
     ax1.axhspan(0, 0.2, xmin=0, xmax=1, color="lightgreen", alpha=0.3, label="ground")
     ax1.axvspan(-DroneEnv2D.LAND_X_THRESHOLD, DroneEnv2D.LAND_X_THRESHOLD,
                 alpha=0.15, color="gold", label="target zone")
@@ -119,7 +119,7 @@ def plot_trajectory(history: dict):
     ax1.legend(fontsize=8)
     ax1.grid(True, linestyle="--", alpha=0.5)
 
-    # ---- Panel 2: Height over time ----
+    # ---- Paneel 2: hoogte over tijd ----
     ax2 = axes[0, 1]
     ax2.plot(steps, z, color="darkorange", linewidth=1.5)
     ax2.axhline(0, color="green", linewidth=1.2, linestyle="--", label="ground z=0")
@@ -129,7 +129,7 @@ def plot_trajectory(history: dict):
     ax2.legend(fontsize=8)
     ax2.grid(True, linestyle="--", alpha=0.5)
 
-    # ---- Panel 3: Velocities over time ----
+    # ---- Paneel 3: snelheden over tijd ----
     ax3 = axes[1, 0]
     ax3.plot(steps, vx, color="royalblue",  linewidth=1.5, label="vx (horizontal)")
     ax3.plot(steps, vz, color="firebrick",  linewidth=1.5, label="vz (vertical)")
@@ -140,7 +140,7 @@ def plot_trajectory(history: dict):
     ax3.legend(fontsize=8)
     ax3.grid(True, linestyle="--", alpha=0.5)
 
-    # ---- Panel 4: Reward signal over time ----
+    # ---- Paneel 4: rewardsignaal over tijd ----
     ax4 = axes[1, 1]
     cumulative = np.cumsum(rewards)
     ax4.bar(steps, rewards, color="mediumpurple", alpha=0.6, width=0.8, label="step reward")

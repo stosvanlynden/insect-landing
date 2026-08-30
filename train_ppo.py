@@ -1,33 +1,33 @@
 """
 train_ppo.py
 ------------
-Trains a PPO (Proximal Policy Optimization) agent on DroneEnv2D.
+Traint een PPO (Proximal Policy Optimization) agent op DroneEnv2D.
 
-What is PPO?
-------------
-PPO is a popular reinforcement learning algorithm that works well with
-continuous action spaces (like our ax, az controls). It learns by:
-  1. Running the current policy (neural network) in the environment
-  2. Measuring which actions led to high rewards
-  3. Updating the network — but not too aggressively (the "proximal" part)
-     so that training stays stable.
+Wat is PPO?
+-----------
+PPO is een populair reinforcement-learningalgoritme dat goed werkt met
+continue actieruimtes (zoals onze ax-, az-besturing). Het leert door:
+  1. Het huidige beleid (neuraal netwerk) in de omgeving te draaien
+  2. Te meten welke acties tot hoge rewards leidden
+  3. Het netwerk bij te werken — maar niet te agressief (het "proximal"-deel),
+     zodat het trainen stabiel blijft.
 
-We use Stable-Baselines3 (SB3) which gives us a ready-to-use PPO
-implementation. We only need to plug in our custom environment.
+We gebruiken Stable-Baselines3 (SB3), dat een kant-en-klare PPO-implementatie
+geeft. We hoeven alleen onze eigen omgeving erin te pluggen.
 
-Run from insect_landing/ folder:
+Uitvoeren vanuit de map insect_landing/:
     python train_ppo.py
 
-The trained model is saved to:
+Het getrainde model wordt opgeslagen in:
     models/ppo_drone_final.zip
-Training logs (for TensorBoard) go to:
+Trainingslogs (voor TensorBoard) gaan naar:
     logs/ppo_drone/
 """
 
 import sys
 import os
 
-# Make sure the package root is on the path
+# Zorg dat de projectroot op het pad staat
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import numpy as np
@@ -48,47 +48,47 @@ from envs import DroneEnv2D
 
 class ProgressCallback(BaseCallback):
     """
-    Prints training progress to the console so you can follow along
-    without needing TensorBoard.
+    Print de trainingsvoortgang naar de console, zodat je kan meekijken
+    zonder dat TensorBoard nodig is.
     """
 
     def __init__(self, print_every: int = 10_000, verbose: int = 0):
         super().__init__(verbose)
         self.print_every = print_every
-        self.episode_rewards = []   # buffer for completed episode rewards
+        self.episode_rewards = []   # buffer voor afgeronde episode-rewards
         self.episode_lengths = []
 
     def _on_step(self) -> bool:
-        # SB3 stores episode info in self.locals["infos"] after each step
+        # SB3 zet episode-info in self.locals["infos"] na elke stap
         for info in self.locals.get("infos", []):
             if "episode" in info:
                 self.episode_rewards.append(info["episode"]["r"])
                 self.episode_lengths.append(info["episode"]["l"])
 
-        # Print summary every N timesteps
+        # Elke N tijdstappen een samenvatting printen
         if self.num_timesteps % self.print_every == 0 and self.episode_rewards:
-            mean_r = np.mean(self.episode_rewards[-50:])   # last 50 episodes
+            mean_r = np.mean(self.episode_rewards[-50:])   # laatste 50 episodes
             mean_l = np.mean(self.episode_lengths[-50:])
             print(
                 f"  Timestep {self.num_timesteps:>8,d} | "
                 f"mean reward (last 50 ep): {mean_r:+7.1f} | "
                 f"mean length: {mean_l:5.0f} steps"
             )
-        return True  # returning False would stop training early
+        return True  # False teruggeven zou de training vroegtijdig stoppen
 
 
 # Trainingsconfiguratie
 
-# Total number of environment steps to train for.
-# More = better agent, but slower. Start with 200k to get a feel.
-# A well-trained agent typically needs 500k–1M steps.
+# Totaal aantal omgevingsstappen om op te trainen.
+# Meer = betere agent, maar trager. Begin met 200k om een gevoel te krijgen.
+# Een goed getrainde agent heeft doorgaans 500k-1M stappen nodig.
 TOTAL_TIMESTEPS = 1_000_000
 
-# Number of parallel environments to collect experience from.
-# More envs = faster data collection. 4 is a safe default.
+# Aantal parallelle omgevingen om ervaring uit te verzamelen.
+# Meer omgevingen = snellere dataverzameling. 4 is een veilige standaard.
 N_ENVS = 4
 
-# Where to save models and logs
+# Waar modellen en logs worden opgeslagen
 MODEL_DIR = "models"
 LOG_DIR   = "logs"
 MODEL_NAME = "ppo_drone"
@@ -108,9 +108,9 @@ def train():
     print(f"  Model save path : {MODEL_DIR}/{MODEL_NAME}_final.zip")
     print("=" * 60)
 
-    # --- Create the training environment ---
-    # make_vec_env wraps N_ENVS copies of our environment in parallel.
-    # Monitor wraps each env to track episode rewards and lengths.
+    # --- Trainingsomgeving aanmaken ---
+    # make_vec_env wikkelt N_ENVS kopieën van onze omgeving parallel in.
+    # Monitor wikkelt elke omgeving zodat episode-rewards en -lengtes bijgehouden worden.
     train_env = make_vec_env(
         DroneEnv2D,
         n_envs=N_ENVS,
@@ -118,7 +118,7 @@ def train():
         wrapper_class=Monitor,
     )
 
-    # --- VecNormalize: load existing stats if available, else create fresh ---
+    # --- VecNormalize: bestaande statistieken laden indien aanwezig, anders vers beginnen ---
     norm_path = os.path.join(MODEL_DIR, "vec_normalize.pkl")
     if os.path.exists(norm_path):
         print(f"  Resuming normalisation stats from: {norm_path}")
@@ -128,14 +128,15 @@ def train():
     else:
         train_env = VecNormalize(train_env, norm_obs=True, norm_reward=True, clip_obs=10.0)
 
-    # --- Create a separate evaluation environment ---
+    # --- Een aparte evaluatie-omgeving aanmaken ---
     eval_env = make_vec_env(DroneEnv2D, n_envs=1, seed=99, wrapper_class=Monitor)
     eval_env = VecNormalize(eval_env, norm_obs=True, norm_reward=False, clip_obs=10.0,
                             training=False)
 
-    # --- Load existing model or create a new one ---
-    # If a previously trained model exists, we resume from it so we don't
-    # throw away progress. Otherwise we start fresh with default hyperparams.
+    # --- Bestaand model laden of een nieuwe aanmaken ---
+    # Als er al een eerder getraind model bestaat, gaan we daarmee verder
+    # zodat er geen voortgang verloren gaat. Anders beginnen we vers met
+    # standaard hyperparameters.
     final_model_path = os.path.join(MODEL_DIR, f"{MODEL_NAME}_final.zip")
     best_model_path  = os.path.join(MODEL_DIR, "best", "best_model.zip")
 
@@ -147,9 +148,9 @@ def train():
         model = PPO.load(final_model_path, env=train_env, seed=42)
     else:
         print("  No saved model found — starting fresh.\n")
-        # policy="MlpPolicy": fully-connected neural network
-        # Input: 4 state values (x, z, vx, vz)
-        # Output: 2 action values (ax, az)
+        # policy="MlpPolicy": volledig verbonden neuraal netwerk
+        # Input: 4 toestandswaarden (x, z, vx, vz)
+        # Output: 2 actiewaarden (ax, az)
         model = PPO(
             policy="MlpPolicy",
             env=train_env,
@@ -169,49 +170,50 @@ def train():
 
     print(f"\nNeural network architecture: {model.policy}\n")
 
-    # Synchronise the eval env's normalisation statistics with the training env.
-    # They start identical; during training only the train_env stats update,
-    # so we pass those stats to eval_env before each evaluation via the callback.
+    # De normalisatiestatistieken van de eval-omgeving synchroniseren met de
+    # trainingsomgeving. Ze beginnen identiek; tijdens het trainen worden
+    # alleen de statistieken van train_env bijgewerkt, dus we geven die
+    # statistieken vóór elke evaluatie door aan eval_env via de callback.
     eval_env.obs_rms = train_env.obs_rms
 
     # --- Callbacks ---
 
-    # Save a checkpoint every 50k steps so you don't lose progress
+    # Elke 50k stappen een checkpoint opslaan, zodat er geen voortgang verloren gaat
     checkpoint_cb = CheckpointCallback(
-        save_freq=50_000 // N_ENVS,   # per-env steps
+        save_freq=50_000 // N_ENVS,   # stappen per omgeving
         save_path=MODEL_DIR,
         name_prefix=MODEL_NAME,
         verbose=0,
     )
 
-    # Evaluate the agent every 20k steps and save the best version
+    # Elke 20k stappen de agent evalueren en de beste versie opslaan
     eval_cb = EvalCallback(
         eval_env=eval_env,
         best_model_save_path=f"{MODEL_DIR}/best",
         log_path=LOG_DIR,
         eval_freq=20_000 // N_ENVS,
-        n_eval_episodes=20,           # run 20 episodes and average the reward
-        deterministic=True,           # use the greedy policy for evaluation
+        n_eval_episodes=20,           # 20 episodes draaien en de reward middelen
+        deterministic=True,           # het greedy beleid gebruiken tijdens evaluatie
         verbose=1,
     )
 
-    # Our custom progress printer
+    # Onze eigen voortgangsprinter
     progress_cb = ProgressCallback(print_every=10_000)
 
-    # --- Train! ---
+    # --- Trainen! ---
     print("Starting training...\n")
     model.learn(
         total_timesteps=TOTAL_TIMESTEPS,
         callback=[checkpoint_cb, eval_cb, progress_cb],
-        progress_bar=False,    # set True only if tqdm+rich are installed
+        progress_bar=False,    # alleen True zetten als tqdm+rich geïnstalleerd zijn
     )
 
-    # --- Save the final model and normalisation stats ---
+    # --- Het eindmodel en de normalisatiestatistieken opslaan ---
     final_path = os.path.join(MODEL_DIR, f"{MODEL_NAME}_final")
     model.save(final_path)
 
-    # VecNormalize stats (running mean/std) must be saved separately so the
-    # eval script can reproduce the same input scaling.
+    # VecNormalize-statistieken (lopend gemiddelde/std) moeten apart worden
+    # opgeslagen, zodat het eval-script dezelfde inputschaling kan reproduceren.
     norm_path = os.path.join(MODEL_DIR, "vec_normalize.pkl")
     train_env.save(norm_path)
 

@@ -1,18 +1,18 @@
 """
 eval_agent.py
 -------------
-Loads a trained PPO model and runs it in DroneEnv2D to evaluate performance.
+Laadt een getraind PPO-model en draait het in DroneEnv2D om de prestaties te evalueren.
 
-What this script does:
-  1. Loads the saved model (best or final)
-  2. Runs N_EVAL_EPISODES episodes using the trained policy
-  3. Prints statistics (success rate, mean reward, mean landing speed)
-  4. Plots the trajectory of the BEST episode (highest reward)
+Wat dit script doet:
+  1. Laadt het opgeslagen model (best of final)
+  2. Draait N_EVAL_EPISODES episodes met het getrainde beleid
+  3. Print statistieken (succespercentage, gemiddelde reward, gemiddelde landingssnelheid)
+  4. Plot het traject van de BESTE episode (hoogste reward)
 
-Run from insect_landing/ folder:
+Uitvoeren vanuit de map insect_landing/:
     python eval_agent.py
 
-Make sure you have trained a model first:
+Zorg dat je eerst een model hebt getraind:
     python train_ppo.py
 """
 
@@ -31,17 +31,17 @@ from envs import DroneEnv2D
 
 # Configuratie
 
-# Which model to load — prefer the best model saved by EvalCallback
+# Welk model te laden — bij voorkeur het beste model dat door EvalCallback is opgeslagen
 MODEL_PATH = "models/best/best_model.zip"
 FALLBACK_MODEL_PATH = "models/ppo_drone_final.zip"
 
-# VecNormalize statistics (must match what was used during training)
+# VecNormalize-statistieken (moeten overeenkomen met wat tijdens training is gebruikt)
 NORM_PATH = "models/vec_normalize.pkl"
 
-# How many episodes to evaluate
+# Hoeveel episodes te evalueren
 N_EVAL_EPISODES = 30
 
-# Whether to print each step (useful for debugging, noisy for many episodes)
+# Of elke stap geprint wordt (handig om te debuggen, rommelig bij veel episodes)
 RENDER_STEPS = False
 
 
@@ -49,18 +49,18 @@ RENDER_STEPS = False
 
 def run_episode(model, vec_env, deterministic: bool = True) -> dict:
     """
-    Runs one full episode using a VecNormalize-wrapped environment.
+    Draait één volledige episode met een door VecNormalize omwikkelde omgeving.
 
-    VecNormalize normalises the observations before feeding them to the model,
-    exactly as was done during training. The raw (unnormalised) state is read
-    from info so the plots show real physical units.
+    VecNormalize normaliseert de observaties voordat ze naar het model gaan,
+    precies zoals tijdens de training. De ruwe (niet-genormaliseerde) toestand
+    wordt uit info gelezen, zodat de plots echte fysieke eenheden tonen.
 
-    deterministic=True  → agent always picks the action with highest probability
-                           (the greedy policy — used for evaluation)
-    deterministic=False → agent samples from the distribution (exploration)
+    deterministic=True  → agent kiest altijd de actie met de hoogste kans
+                           (het greedy beleid — gebruikt voor evaluatie)
+    deterministic=False → agent trekt een steekproef uit de verdeling (verkenning)
     """
 
-    obs = vec_env.reset()   # VecEnv returns obs directly (no info tuple)
+    obs = vec_env.reset()   # VecEnv geeft obs direct terug (geen info-tuple)
     history = {
         "x": [], "z": [], "vx": [], "vz": [],
         "ax": [], "az": [], "reward": [], "step": [],
@@ -68,12 +68,12 @@ def run_episode(model, vec_env, deterministic: bool = True) -> dict:
     total_reward = 0.0
 
     while True:
-        # Ask the model what action to take given the NORMALISED observation
+        # Het model vragen welke actie te nemen, gegeven de GENORMALISEERDE observatie
         action, _ = model.predict(obs, deterministic=deterministic)
 
         obs, reward, done, info = vec_env.step(action)
 
-        # info is a list of dicts (one per env); we only have 1 env here
+        # info is een lijst van dicts (één per omgeving); hier hebben we er maar 1
         i = info[0]
 
         history["x"].append(i["x"])
@@ -90,7 +90,7 @@ def run_episode(model, vec_env, deterministic: bool = True) -> dict:
         if done[0]:
             break
 
-    # Classify the outcome
+    # De uitkomst classificeren
     x_final  = history["x"][-1]
     z_final  = history["z"][-1]
     vz_final = history["vz"][-1]
@@ -135,7 +135,7 @@ def evaluate(model, vec_env, n_episodes: int = N_EVAL_EPISODES):
             f"vz={result['vz_final']:+5.2f}m/s"
         )
 
-    # Aggregate statistics
+    # Statistieken samenvatten
     rewards      = [r["total_reward"]  for r in results]
     safe_count   = sum(r["safe_landing"] for r in results)
     landing_vzs  = [abs(r["vz_final"])  for r in results if r["z_final"] <= 0.05]
@@ -155,7 +155,7 @@ def evaluate(model, vec_env, n_episodes: int = N_EVAL_EPISODES):
               f"(threshold: {DroneEnv2D.LAND_VZ_THRESHOLD} m/s)")
     print("=" * 55)
 
-    # Return the episode with the highest total reward for plotting
+    # De episode met de hoogste totale reward teruggeven om te plotten
     best_result = max(results, key=lambda r: r["total_reward"])
     return results, best_result
 
@@ -177,9 +177,9 @@ def plot_best_episode(result: dict):
     fig, axes = plt.subplots(2, 2, figsize=(12, 8))
     fig.suptitle(title, fontsize=14, fontweight="bold")
 
-    # ---- Panel 1: 2-D spatial trajectory ----
+    # ---- Paneel 1: 2D-traject in de ruimte ----
     ax1 = axes[0, 0]
-    # Colour the path by time (early = blue, late = red)
+    # Het pad inkleuren op basis van tijd (vroeg = blauw, laat = rood)
     n = len(x)
     colors = plt.cm.plasma(np.linspace(0, 1, n))
     for i in range(n - 1):
@@ -196,7 +196,7 @@ def plot_best_episode(result: dict):
     ax1.legend(fontsize=8)
     ax1.grid(True, linestyle="--", alpha=0.5)
 
-    # ---- Panel 2: Height over time ----
+    # ---- Paneel 2: hoogte over tijd ----
     ax2 = axes[0, 1]
     ax2.plot(steps, z, color="darkorange", linewidth=1.8)
     ax2.axhline(0, color="green", linewidth=1.2, linestyle="--", label="ground z=0")
@@ -206,7 +206,7 @@ def plot_best_episode(result: dict):
     ax2.legend(fontsize=8)
     ax2.grid(True, linestyle="--", alpha=0.5)
 
-    # ---- Panel 3: Velocities over time ----
+    # ---- Paneel 3: snelheden over tijd ----
     ax3 = axes[1, 0]
     ax3.plot(steps, vx, color="royalblue", linewidth=1.8, label="vx (horizontal)")
     ax3.plot(steps, vz, color="firebrick", linewidth=1.8, label="vz (vertical)")
@@ -219,8 +219,8 @@ def plot_best_episode(result: dict):
     ax3.legend(fontsize=8)
     ax3.grid(True, linestyle="--", alpha=0.5)
 
-    # ---- Panel 4: Thrust over time ----
-    # (more interesting than raw reward for a trained agent)
+    # ---- Paneel 4: stuwkracht over tijd ----
+    # (interessanter dan de ruwe reward voor een getrainde agent)
     ax4 = axes[1, 1]
     ax4.plot(steps, az, color="mediumpurple", linewidth=1.8, label="az thrust")
     ax4.axhline(DroneEnv2D.GRAVITY, color="gray", linewidth=1.0,
@@ -242,7 +242,7 @@ def plot_best_episode(result: dict):
 
 if __name__ == "__main__":
 
-    # Load the trained model
+    # Het getrainde model laden
     if os.path.exists(MODEL_PATH):
         print(f"Loading best model from: {MODEL_PATH}")
         model = PPO.load(MODEL_PATH)
@@ -254,27 +254,27 @@ if __name__ == "__main__":
         print("Run  python train_ppo.py  first.")
         sys.exit(1)
 
-    # --- Build a normalised eval environment ---
-    # The agent was trained on normalised observations, so we MUST apply the
-    # same normalisation here. We load the running mean/std stats that were
-    # saved at the end of training.
+    # --- Een genormaliseerde eval-omgeving opbouwen ---
+    # De agent is getraind op genormaliseerde observaties, dus we MOETEN hier
+    # dezelfde normalisatie toepassen. We laden de lopende gemiddelde/std-
+    # statistieken die aan het eind van de training zijn opgeslagen.
     raw_env = DummyVecEnv([lambda: DroneEnv2D()])
 
     if os.path.exists(NORM_PATH):
         print(f"Loading normalisation stats from: {NORM_PATH}")
         vec_env = VecNormalize.load(NORM_PATH, raw_env)
-        vec_env.training = False      # do NOT update stats during evaluation
-        vec_env.norm_reward = False   # show real reward, not normalised
+        vec_env.training = False      # statistieken NIET bijwerken tijdens evaluatie
+        vec_env.norm_reward = False   # de echte reward tonen, niet de genormaliseerde
     else:
         print("WARNING: normalisation stats not found — results may be poor.")
         vec_env = raw_env
 
-    # Run evaluation and collect results
+    # Evaluatie draaien en resultaten verzamelen
     results, best = evaluate(model, vec_env, n_episodes=N_EVAL_EPISODES)
 
     print(f"\nBest episode: reward={best['total_reward']:+.1f}, "
           f"steps={best['n_steps']}, safe={best['safe_landing']}")
 
-    # Plot the best episode
+    # De beste episode plotten
     plot_best_episode(best)
     vec_env.close()

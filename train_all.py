@@ -1,27 +1,27 @@
 """
 train_all.py
 ------------
-Unified training script for Experiments A, B and D.
+Eén trainingsscript voor Experimenten A, B en D.
 
-Usage (from insect_landing/ folder):
+Gebruik (vanuit de map insect_landing/):
     python train_all.py --agent baseline --seed 0
     python train_all.py --agent tau      --seed 1
     python train_all.py --agent tau      --seed 0 --coeff 0.20
 
-Arguments:
-    --agent   : 'baseline' or 'tau'
+Argumenten:
+    --agent   : 'baseline' of 'tau'
     --seed    : integer seed (0, 1, 2, ...)
-    --coeff   : TAU_SHAPING_COEF (only for tau agent, default 0.10)
-    --steps   : total training timesteps (default 1_000_000)
+    --coeff   : TAU_SHAPING_COEF (alleen voor de tau-agent, standaard 0.10)
+    --steps   : totaal aantal trainingsstappen (standaard 1_000_000)
 
 Output:
     models/<agent>/seed_<seed>/best/best_model.zip
     models/<agent>/seed_<seed>/vec_normalize.pkl
-    logs/<agent>_seed<seed>_coeff<coeff>.csv   <- learning curves
-        columns: timestep, success_rate, mean_vz, std_vz, mean_tau_error
+    logs/<agent>_seed<seed>_coeff<coeff>.csv   <- leercurves
+        kolommen: timestep, success_rate, mean_vz, std_vz, mean_tau_error
 
-The CSV is used by analyse.py to produce the learning-curve figures
-and by eval_wind.py to identify which models to load.
+De CSV wordt gebruikt door analyse.py om de leercurve-figuren te maken,
+en door eval_wind.py om te bepalen welke modellen geladen moeten worden.
 """
 
 import sys
@@ -45,9 +45,9 @@ from envs import DroneEnv2D, DroneEnvTau2D
 
 def compute_tau_error(z_list, vz_list, dt=0.1):
     """
-    Mean |dtau/dt - (-0.5)| over all descent steps in one episode.
-    tau = z / |vz|, dtau/dt approximated by finite differences.
-    Returns NaN if the drone never descended meaningfully.
+    Gemiddelde |dtau/dt - (-0.5)| over alle daalstappen in één episode.
+    tau = z / |vz|, dtau/dt benaderd met eindige verschillen.
+    Geeft NaN terug als de drone nooit betekenisvol heeft gedaald.
     """
     errors = []
     tau_prev = None
@@ -56,11 +56,11 @@ def compute_tau_error(z_list, vz_list, dt=0.1):
             tau = z / (-vz)                     # time-to-contact
             if tau_prev is not None:
                 tau_dot = (tau - tau_prev) / dt
-                if abs(tau_dot) < 15:           # filter extreme outliers
+                if abs(tau_dot) < 15:           # extreme uitschieters filteren
                     errors.append(abs(tau_dot - (-0.5)))
             tau_prev = tau
         else:
-            tau_prev = None                     # reset on ascent / hover
+            tau_prev = None                     # resetten bij stijgen/hoveren
     return float(np.mean(errors)) if errors else float("nan")
 
 
@@ -68,19 +68,19 @@ def compute_tau_error(z_list, vz_list, dt=0.1):
 
 class MetricsCallback(BaseCallback):
     """
-    Every `eval_freq` timesteps:
-      1. Runs `n_eval_episodes` episodes with the deterministic policy
-      2. Computes success_rate, mean/std touchdown |vz|, mean tau-error
-      3. Appends one row to the CSV file
+    Elke `eval_freq` tijdstappen:
+      1. Draait `n_eval_episodes` episodes met het deterministische beleid
+      2. Berekent success_rate, gemiddelde/std landings-|vz|, gemiddelde tau-fout
+      3. Voegt één rij toe aan het CSV-bestand
 
-    This gives us the learning-curve data for Experiment B and a
-    live view of training progress without TensorBoard.
+    Dit levert de leercurve-data voor Experiment B, en een live beeld van
+    de trainingsvoortgang zonder TensorBoard.
     """
 
     def __init__(
         self,
-        eval_env,          # VecNormalize-wrapped evaluation environment
-        csv_path: str,     # path to the CSV file (created/appended)
+        eval_env,          # door VecNormalize omwikkelde evaluatie-omgeving
+        csv_path: str,     # pad naar het CSV-bestand (wordt aangemaakt/aangevuld)
         eval_freq: int = 20_000,
         n_eval_episodes: int = 20,
         verbose: int = 0,
@@ -92,7 +92,7 @@ class MetricsCallback(BaseCallback):
         self.n_eval_episodes = n_eval_episodes
         self._last_eval_step = 0
 
-        # Write CSV header
+        # CSV-header schrijven
         with open(csv_path, "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow([
@@ -101,15 +101,15 @@ class MetricsCallback(BaseCallback):
             ])
 
     def _on_step(self) -> bool:
-        # Only evaluate every eval_freq steps
+        # Alleen elke eval_freq stappen evalueren
         if self.num_timesteps - self._last_eval_step < self.eval_freq:
             return True
         self._last_eval_step = self.num_timesteps
 
-        # Sync normalisation stats from training env to eval env
+        # Normalisatiestatistieken synchroniseren van de trainings- naar de eval-omgeving
         self.eval_env.obs_rms = self.training_env.obs_rms
 
-        # Run evaluation episodes
+        # Evaluatie-episodes draaien
         successes   = []
         vz_landings = []
         tau_errors  = []
@@ -118,7 +118,7 @@ class MetricsCallback(BaseCallback):
         ep_z, ep_vz = [], []
         ep_step = 0
 
-        # We run episodes one by one (DummyVecEnv with 1 env)
+        # We draaien de episodes één voor één (DummyVecEnv met 1 omgeving)
         episodes_done = 0
         while episodes_done < self.n_eval_episodes:
             action, _ = self.model.predict(obs, deterministic=True)
@@ -144,20 +144,20 @@ class MetricsCallback(BaseCallback):
                     vz_landings.append(abs(vz_f))
                 tau_errors.append(compute_tau_error(ep_z, ep_vz))
 
-                # Reset for next episode
+                # Klaarzetten voor de volgende episode
                 obs    = self.eval_env.reset()
                 ep_z   = []
                 ep_vz  = []
                 episodes_done += 1
 
-        # Compute summary statistics
+        # Samenvattende statistieken berekenen
         success_rate  = float(np.mean(successes))
         mean_vz       = float(np.mean(vz_landings))   if vz_landings else float("nan")
         std_vz        = float(np.std(vz_landings))    if vz_landings else float("nan")
         tau_valid     = [e for e in tau_errors if not np.isnan(e)]
         mean_tau_err  = float(np.mean(tau_valid))     if tau_valid   else float("nan")
 
-        # Append to CSV
+        # Toevoegen aan de CSV
         with open(self.csv_path, "a", newline="") as f:
             writer = csv.writer(f)
             writer.writerow([
@@ -168,7 +168,7 @@ class MetricsCallback(BaseCallback):
                 f"{mean_tau_err:.4f}",
             ])
 
-        # Print progress
+        # Voortgang printen
         print(
             f"  [{self.num_timesteps:>8,d}] "
             f"success={success_rate:.0%}  "
@@ -182,7 +182,7 @@ class MetricsCallback(BaseCallback):
 
 def train(agent: str, seed: int, coeff: float, total_steps: int):
 
-    # ---- Directory setup ----
+    # ---- Mappen klaarzetten ----
     if agent == "baseline":
         model_dir = os.path.join("models", f"seed_{seed}")
         log_name  = f"baseline_seed{seed}"
@@ -203,7 +203,7 @@ def train(agent: str, seed: int, coeff: float, total_steps: int):
     print(f"  CSV log   : {csv_path}")
     print("=" * 65)
 
-    # ---- Environment factory ----
+    # ---- Omgeving-fabriek ----
     if agent == "baseline":
         env_fn      = lambda: DroneEnv2D()
         eval_env_fn = lambda: DroneEnv2D()
@@ -211,7 +211,7 @@ def train(agent: str, seed: int, coeff: float, total_steps: int):
         env_fn      = lambda c=coeff: DroneEnvTau2D(tau_shaping_coef=c)
         eval_env_fn = lambda c=coeff: DroneEnvTau2D(tau_shaping_coef=c)
 
-    # ---- Training environment ----
+    # ---- Trainingsomgeving ----
     train_env = make_vec_env(env_fn, n_envs=4, seed=seed, wrapper_class=Monitor)
 
     norm_path = os.path.join(model_dir, "vec_normalize.pkl")
@@ -223,13 +223,13 @@ def train(agent: str, seed: int, coeff: float, total_steps: int):
     else:
         train_env = VecNormalize(train_env, norm_obs=True, norm_reward=True, clip_obs=10.0)
 
-    # ---- Evaluation environment (1 env, no reward norm) ----
+    # ---- Evaluatie-omgeving (1 omgeving, geen reward-normalisatie) ----
     eval_env = DummyVecEnv([eval_env_fn])
     eval_env = VecNormalize(eval_env, norm_obs=True, norm_reward=False,
                             clip_obs=10.0, training=False)
     eval_env.obs_rms = train_env.obs_rms
 
-    # ---- Model: always start fresh per seed (reproducibility) ----
+    # ---- Model: begint per seed altijd opnieuw (reproduceerbaarheid) ----
     best_path = os.path.join(model_dir, "best", "best_model.zip")
     if os.path.exists(best_path):
         print(f"  Resuming model from: {best_path}\n")
@@ -255,13 +255,13 @@ def train(agent: str, seed: int, coeff: float, total_steps: int):
 
     # ---- Callbacks ----
     checkpoint_cb = CheckpointCallback(
-        save_freq   = 100_000 // 4,   # every 100k steps
+        save_freq   = 100_000 // 4,   # elke 100k stappen
         save_path   = model_dir,
         name_prefix = f"ckpt_{agent}_s{seed}",
         verbose=0,
     )
 
-    # Standard SB3 EvalCallback saves best model
+    # De standaard SB3 EvalCallback slaat het beste model op
     eval_cb = EvalCallback(
         eval_env=eval_env,
         best_model_save_path=os.path.join(model_dir, "best"),
@@ -269,18 +269,18 @@ def train(agent: str, seed: int, coeff: float, total_steps: int):
         eval_freq=20_000 // 4,
         n_eval_episodes=20,
         deterministic=True,
-        verbose=0,           # suppress default output; MetricsCallback prints instead
+        verbose=0,           # standaard output onderdrukken; MetricsCallback print zelf
     )
 
-    # Our custom CSV logger
+    # Onze eigen CSV-logger
     metrics_cb = MetricsCallback(
         eval_env=eval_env,
         csv_path=csv_path,
-        eval_freq=20_000,    # every 20k timesteps total
+        eval_freq=20_000,    # elke 20k tijdstappen in totaal
         n_eval_episodes=20,
     )
 
-    # ---- Train ----
+    # ---- Trainen ----
     print("Training started...\n")
     model.learn(
         total_timesteps=total_steps,
@@ -288,7 +288,7 @@ def train(agent: str, seed: int, coeff: float, total_steps: int):
         progress_bar=False,
     )
 
-    # ---- Save final model + normalisation stats ----
+    # ---- Eindmodel + normalisatiestatistieken opslaan ----
     final_path = os.path.join(model_dir, f"final_model")
     model.save(final_path)
     train_env.save(norm_path)
