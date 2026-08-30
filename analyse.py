@@ -373,7 +373,7 @@ def fig_boxplots_and_stats():
                 linestyle="--", alpha=0.6, label=f"Safe limit ({DroneEnv2D.LAND_VZ_THRESHOLD} m/s)")
     ax1.set_ylabel("Touchdown |vz| (m/s)")
     ax1.set_ylim(0, 1.2)   # inzoomen — alle data ligt onder 1.1 m/s
-    ax1.set_title(f"Landing speed\n(Wilcoxon {sig})")
+    ax1.set_title(f"Landing speed\n(episode-level Wilcoxon {sig})")
     ax1.legend(fontsize=8)
     ax1.grid(True, axis="y", linestyle="--", alpha=0.4)
 
@@ -394,7 +394,7 @@ def fig_boxplots_and_stats():
     # Geen "perfecte regulatie"-lijn — dat wekt een onrealistische verwachting
     ax2.set_ylabel("|dtau/dt - (-0.5)|")
     ax2.set_title(f"Tau-regulation error\n(lower = more bio-inspired)\n"
-                  f"Improvement: {improvement:+.1f}%  ({sig_te})")
+                  f"Improvement: {improvement:+.1f}%  (episode-level {sig_te})")
     ax2.grid(True, axis="y", linestyle="--", alpha=0.4)
 
     plt.tight_layout()
@@ -411,8 +411,8 @@ def fig_tau_histogram(dtau_b, dtau_t):
     print("\nGenerating Fig 3: dtau/dt histogram...")
 
     fig, ax = plt.subplots(figsize=(9, 5))
-    fig.suptitle("Distribution of dtau/dt during descent phases\n"
-                 "Biological target: dtau/dt = -0.5 (grey dashed)",
+    fig.suptitle("Distribution of τ̇ during descent phases\n"
+                 "Selected target: τ̇ = -0.5 (grey dashed)",
                  fontsize=12, fontweight="bold")
 
     # X-as beperken tot -5 tot 1.0 — het positieve bereik is bijna leeg
@@ -426,32 +426,24 @@ def fig_tau_histogram(dtau_b, dtau_t):
             density=True, label=f"Tau agent (n={len(dtau_t):,} steps, mean={m_t:.2f})")
 
     ax.axvline(-0.5, color="grey", linewidth=2, linestyle="--",
-               label="Biological target: dtau/dt = -0.5")
+               label="Selected target: τ̇ = -0.5")
     ax.axvline(-1.0, color="lightcoral", linewidth=1.2, linestyle=":",
                label="Constant-speed descent (-1.0)")
     ax.axvline(m_b, color="royalblue",  linewidth=1.5, linestyle="-", alpha=0.8)
     ax.axvline(m_t, color="darkorange", linewidth=1.5, linestyle="-", alpha=0.8)
 
-    ax.set_xlabel("dtau/dt  (s/s)")
+    ax.set_xlabel("τ̇  (s/s)")
     ax.set_ylabel("Density")
     ax.set_xlim(-5, 1.0)
     # Legenda buiten de plot — voorkomt overlap met de histogrambalken
     ax.legend(fontsize=8.5, loc="upper left", framealpha=0.9)
     ax.grid(True, linestyle="--", alpha=0.4)
 
-    # Annotatie die uitlegt waarom beide agents ver van -0.5 afzitten
-    ax.annotate("Note: time penalty (-0.3/step)\npushes agents to land quickly,\ncompeting with tau-regulation",
-                xy=(-0.5, 0.6), xytext=(-4.5, 0.7),
-                fontsize=7.5, color="dimgrey",
-                bbox=dict(boxstyle="round,pad=0.3", facecolor="lightyellow",
-                          edgecolor="grey", alpha=0.8),
-                arrowprops=dict(arrowstyle="->", color="grey", lw=0.8))
-
     plt.tight_layout()
     path = os.path.join(FIG_DIR, "fig3_tau_histogram.png")
     plt.savefig(path, dpi=150, bbox_inches="tight")
     print(f"  Saved: {path}")
-    print(f"  Baseline mean dtau/dt: {m_b:.3f}  |  Tau mean dtau/dt: {m_t:.3f}")
+    print(f"  Baseline mean tau_dot: {m_b:.3f}  |  Tau mean tau_dot: {m_t:.3f}")
 
 
 # FIGUUR 4: Windrobuustheid
@@ -527,13 +519,46 @@ def fig_wind_robustness():
 
 # FIGUUR 5: Sensitiviteitsanalyse
 
+def _is_safe_landing(i, env_class):
+    """Safe-landing classificatie o.b.v. de drie landingsdrempels van de env."""
+    if i.get("truncated", False) or i["z"] > 1e-6:
+        return False
+    return (abs(i["x"]) <= env_class.LAND_X_THRESHOLD
+            and abs(i["vz"]) <= env_class.LAND_VZ_THRESHOLD
+            and abs(i["vx"]) <= env_class.LAND_VX_THRESHOLD)
+
+
+def _run_sensitivity_episode(model, vec_env, env_class, ep_seed):
+    """Eén episode met een vast startpunt (zelfde ep_seed-conventie als
+    run_paired_eval), zodat alle zes coëfficiënten x drie seeds exact
+    dezelfde 30 initial conditions gebruiken."""
+    obs = vec_env.reset()
+    try:
+        vec_env.env_method("reset", seed=ep_seed)
+        obs = vec_env.reset()
+    except Exception:
+        pass
+    ep_z, ep_vz = [], []
+    while True:
+        action, _ = model.predict(obs, deterministic=True)
+        obs, _, done, info = vec_env.step(action)
+        i = info[0]
+        ep_z.append(i["z"]); ep_vz.append(i["vz"])
+        if done[0]:
+            return {
+                "vz": abs(i["vz"]),
+                "te": compute_tau_error_traj(ep_z, ep_vz),
+                "safe": _is_safe_landing(i, env_class),
+            }
+
+
 def fig_sensitivity():
-    print("\nGenerating Fig 5: Sensitivity analysis...")
+    print("\nGenerating Fig 5: Sensitivity analysis (deterministic eval seeds)...")
 
     SEEDS = [0, 1, 2]
     results = []
     for coeff in COEFFS:
-        seed_vzs, seed_tes = [], []
+        seed_vzs, seed_tes, seed_successes = [], [], []
         for seed in SEEDS:
             model_path, norm_path = tau_paths(seed, coeff)
             if coeff == 0.10:
@@ -542,6 +567,15 @@ def fig_sensitivity():
                 # met de andere coëfficiënten (alleen 500k stappen). Gebruik
                 # in plaats daarvan het checkpoint op precies 500k stappen,
                 # voor een eerlijk vergelijkingspunt met gelijk budget.
+                # BEKENDE LIMITATIE: norm_path hierboven wijst nog naar de
+                # vec_normalize.pkl die pas na de volle 1M stappen is
+                # weggeschreven (VecNormalize wordt in train_all.py maar
+                # één keer opgeslagen, aan het einde van de run) -- dus dit
+                # 500k-checkpoint wordt geëvalueerd met observatienormalisatie
+                # uit 1M stappen, niet met de (nooit apart bewaarde) 500k-
+                # statistieken. De andere vijf coëfficiënten zijn wel intern
+                # consistent (500k-checkpoint + 500k-statistieken, want die
+                # runs waren zelf maar 500k stappen lang).
                 matched_ckpt = os.path.join(
                     "models_tau", f"seed_{seed}", "coeff_0p10",
                     f"ckpt_tau_s{seed}_500000_steps.zip")
@@ -555,87 +589,101 @@ def fig_sensitivity():
             if model is None:
                 continue
 
-            vz_list, te_list = [], []
-            obs = vec_env.reset()
-            ep_z, ep_vz = [], []
-            episodes_done = 0
-            while episodes_done < 30:
-                action, _ = model.predict(obs, deterministic=True)
-                obs, _, done, info = vec_env.step(action)
-                i = info[0]
-                ep_z.append(i["z"]); ep_vz.append(i["vz"])
-                if done[0]:
-                    vz_list.append(abs(i["vz"]))
-                    te_list.append(compute_tau_error_traj(ep_z, ep_vz))
-                    obs = vec_env.reset(); ep_z = []; ep_vz = []
-                    episodes_done += 1
+            vz_list, te_list, n_safe = [], [], 0
+            for ep in range(30):
+                ep_seed = ep * 7 + 13   # zelfde vaste seeds als Experiment B
+                r = _run_sensitivity_episode(model, vec_env, DroneEnvTau2D, ep_seed)
+                vz_list.append(r["vz"])
+                te_list.append(r["te"])
+                if r["safe"]:
+                    n_safe += 1
             vec_env.close()
 
             te_clean = [x for x in te_list if not np.isnan(x)]
             seed_vzs.append(np.mean(vz_list))
             seed_tes.append(np.mean(te_clean) if te_clean else float("nan"))
+            seed_successes.append(n_safe / 30)
 
         if not seed_vzs:
             continue
         results.append({
-            "coeff":    coeff,
-            "mean_vz":  np.mean(seed_vzs),
-            "std_vz":   np.std(seed_vzs),
-            "mean_te":  np.mean(seed_tes),
-            "std_te":   np.std(seed_tes),
+            "coeff":        coeff,
+            "mean_vz":      np.mean(seed_vzs),
+            "std_vz":       np.std(seed_vzs),
+            "mean_te":      np.mean(seed_tes),
+            "std_te":       np.std(seed_tes),
+            "mean_success": np.mean(seed_successes),
+            "std_success":  np.std(seed_successes),
+            "seed_success": list(seed_successes),
         })
-        print(f"  coeff={coeff:.2f}: mean_vz={np.mean(seed_vzs):.3f}+/-{np.std(seed_vzs):.3f}  "
-              f"tau_err={np.mean(seed_tes):.3f}+/-{np.std(seed_tes):.3f}  (n={len(seed_vzs)} seeds)")
+        print(f"  coeff={coeff:.2f}: success={np.mean(seed_successes):.1%}+/-{np.std(seed_successes):.1%} "
+              f"(per-seed {'/'.join(f'{s:.0%}' for s in seed_successes)})  "
+              f"vz={np.mean(seed_vzs):.3f}+/-{np.std(seed_vzs):.3f}  "
+              f"te={np.mean(seed_tes):.3f}+/-{np.std(seed_tes):.3f}  (n={len(seed_vzs)} seeds)")
 
     if not results:
         print("  No sensitivity data found.")
         return
 
-    coeffs   = [r["coeff"]   for r in results]
-    mean_vzs = [r["mean_vz"] for r in results]
-    std_vzs  = [r["std_vz"]  for r in results]
-    mean_tes = [r["mean_te"] for r in results]
-    std_tes  = [r["std_te"]  for r in results]
+    coeffs        = [r["coeff"]        for r in results]
+    mean_success  = [r["mean_success"] * 100 for r in results]
+    std_success   = [r["std_success"]  * 100 for r in results]
+    mean_vzs      = [r["mean_vz"]      for r in results]
+    std_vzs       = [r["std_vz"]       for r in results]
+    mean_tes      = [r["mean_te"]      for r in results]
+    std_tes       = [r["std_te"]       for r in results]
 
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-    fig.suptitle("Sensitivity analysis: effect of tau shaping coefficient\n"
-                 "(mean +/- std across 3 seeds, 30 eval episodes each, all"
+    fig, axes = plt.subplots(1, 3, figsize=(16, 5.2))
+    fig.suptitle("Sensitivity analysis: effect of tau-reward coefficient λτ\n"
+                 "(mean +/- std across 3 training seeds, 30 fixed-seed eval episodes each, all"
                  " six at the matched 500k-step checkpoint)",
-                 fontsize=10, fontweight="bold")
+                 fontsize=11, fontweight="bold")
 
-    for ax, means, stds, ylabel, title, color in zip(
-        axes,
-        [mean_vzs, mean_tes],
-        [std_vzs,  std_tes],
-        ["Mean touchdown |vz| (m/s)", "|dtau/dt - (-0.5)| (tau-regulation error)"],
-        ["Landing speed vs shaping coefficient",
-         "Tau-regulation error vs shaping coefficient"],
-        ["steelblue", "darkorange"],
-    ):
+    panels = [
+        (axes[0], mean_success, std_success, "Safe-landing success rate (%)",
+         "Success rate vs shaping coefficient", "seagreen"),
+        (axes[1], mean_vzs, std_vzs, "Mean touchdown |vz| (m/s)",
+         "Landing speed vs shaping coefficient", "steelblue"),
+        (axes[2], mean_tes, std_tes, "|dtau/dt - (-0.5)| (tau-regulation error)",
+         "Tau-regulation error vs shaping coefficient", "darkorange"),
+    ]
+
+    for ax, means, stds, ylabel, title, color in panels:
         means = np.array(means); stds = np.array(stds)
         ax.errorbar(coeffs, means, yerr=stds, fmt="o-", color=color,
-                    linewidth=2, markersize=8, capsize=4, elinewidth=1.5)
+                    linewidth=2.2, markersize=9, capsize=5, elinewidth=1.8)
 
         # De coëfficiënt uit de hoofdexperimenten markeren (0.10) -- dit is de
         # waarde die daadwerkelijk multi-seed is getraind, NIET per se het
         # empirische minimum hier (zie de Discussion in het verslag).
         if 0.10 in coeffs:
             idx = coeffs.index(0.10)
-            ax.axvline(0.10, color="grey", linewidth=1.2, linestyle="--", alpha=0.7,
-                       label="lambda=0.10 (used in main experiments)")
-            ax.scatter([coeffs[idx]], [means[idx]], s=120, zorder=5,
-                       color=color, edgecolors="black", linewidth=1.5)
+            ax.axvline(0.10, color="grey", linewidth=1.3, linestyle="--", alpha=0.7,
+                       label="λτ = 0.10 (used in main experiments)")
+            ax.scatter([coeffs[idx]], [means[idx]], s=140, zorder=5,
+                       color=color, edgecolors="black", linewidth=1.6)
 
-        ax.set_xlabel("TAU_SHAPING_COEF")
-        ax.set_ylabel(ylabel)
-        ax.set_title(title)
+        ax.set_xlabel("λτ", fontsize=11)
+        ax.set_ylabel(ylabel, fontsize=10)
+        ax.set_title(title, fontsize=10.5)
+        ax.tick_params(labelsize=9.5)
         ax.legend(fontsize=9)
         ax.grid(True, linestyle="--", alpha=0.5)
+
+    axes[0].set_ylim(-5, 105)
+    axes[0].yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f"{y:.0f}%"))
 
     plt.tight_layout()
     path = os.path.join(FIG_DIR, "fig5_sensitivity.png")
     plt.savefig(path, dpi=150, bbox_inches="tight")
     print(f"  Saved: {path}")
+
+    print("\n  Deterministic sensitivity table:")
+    print(f"  {'lambda':>8}{'succ%':>8}{'succ(0/1/2)':>16}{'vz':>9}{'vz_std':>9}{'te':>9}{'te_std':>9}")
+    for r in results:
+        succ_seeds = "/".join(f"{s:.0%}" for s in r["seed_success"])
+        print(f"  {r['coeff']:>8.2f}{r['mean_success']*100:>7.1f}%{succ_seeds:>16}"
+              f"{r['mean_vz']:>9.3f}{r['std_vz']:>9.3f}{r['mean_te']:>9.3f}{r['std_te']:>9.3f}")
 
 
 # Startpunt
